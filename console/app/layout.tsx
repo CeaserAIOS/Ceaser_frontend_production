@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import favicon from '@/public/favicon.png'
+import faviconLight from '@/public/favicon-light.png'
+import appIcon from '@/public/app-icon.png'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -9,15 +12,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/console/favicon-light.png',
+        url: faviconLight.src,
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/console/favicon.png',
+        url: favicon.src,
         media: '(prefers-color-scheme: dark)',
       },
     ],
-    apple: '/console/app-icon.png',
+    apple: appIcon.src,
   },
 }
 

@@ -2,6 +2,9 @@
 
 import Image from "next/image"
 import { useEffect, useRef } from "react"
+import favicon from "@/public/favicon.png"
+import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
+import lightWordmark from "@/public/ceaser-wordmark-light-transparent.png"
 import { useApp } from "@/lib/app-context"
 import { ceaserAgents, navigationItems } from "@/lib/ceaser"
 import { AgentAvatar } from "./agent-avatar"
@@ -39,7 +42,7 @@ export function Sidebar() {
       <div className="flex h-20 items-center justify-center border-b border-border px-4 py-3 transition-[padding] duration-200">
         {sidebarCollapsed ? (
           <Image
-            src="/console/favicon.png"
+            src={favicon}
             alt="CEASER"
             width={40}
             height={40}
@@ -48,7 +51,7 @@ export function Sidebar() {
           />
         ) : (
           <Image
-            src={theme === "light" ? "/console/ceaser-wordmark-light-transparent.png" : "/console/ceaser-wordmark-dark-transparent.png"}
+            src={theme === "light" ? lightWordmark : darkWordmark}
             alt="CEASER"
             width={178}
             height={46}

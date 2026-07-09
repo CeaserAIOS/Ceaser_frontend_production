@@ -591,7 +591,7 @@ export function SettingsPage() {
             
             <GlowCard>
               <div className="flex items-center gap-4">
-                <CeaserLogo size="lg" showText={false} iconSrc={theme === "light" ? "/console/logo-light.png" : "/console/logo.png"} />
+                <CeaserLogo size="lg" showText={false} />
                 <div>
                   <h3 className="text-lg font-semibold">CEASER OS</h3>
                   <p className="text-muted-foreground">Personal Intelligence Operating System</p>

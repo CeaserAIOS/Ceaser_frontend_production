@@ -295,7 +295,7 @@ export function CommandBar() {
       <div className="border-t border-border bg-background/80 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
-            <CeaserLogo size="sm" showText={false} iconSrc="/console/favicon.png" />
+            <CeaserLogo size="sm" showText={false} />
             <div>
               <p className="text-sm font-medium">CEASER OS</p>
               <p className="text-xs text-muted-foreground">v1.0.0</p>

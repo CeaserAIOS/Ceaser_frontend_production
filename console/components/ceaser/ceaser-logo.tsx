@@ -1,17 +1,19 @@
 "use client"
 
 import Image from "next/image"
+import type { StaticImageData } from "next/image"
 import { cn } from "@/lib/utils"
+import defaultLogo from "@/public/logo.png"
 
 interface CeaserLogoProps {
   size?: "sm" | "md" | "lg"
   showText?: boolean
   showIcon?: boolean
-  iconSrc?: string
+  iconSrc?: string | StaticImageData
   className?: string
 }
 
-export function CeaserLogo({ size = "md", showText = true, showIcon = true, iconSrc = "/console/logo.png", className }: CeaserLogoProps) {
+export function CeaserLogo({ size = "md", showText = true, showIcon = true, iconSrc = defaultLogo, className }: CeaserLogoProps) {
   const sizeClasses = {
     sm: "h-6 w-6",
     md: "h-8 w-8",

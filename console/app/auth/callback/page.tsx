@@ -5,11 +5,14 @@ import { authApi } from "@/lib/api/auth"
 
 export default function AuthCallbackPage() {
   useEffect(() => {
+    const consoleUrl = (
+      process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
+    ).replace(/\/$/, "")
     try {
       authApi.consumeOAuthRedirect()
-      window.location.replace("/")
+      window.location.replace(`${consoleUrl}/`)
     } catch {
-      window.location.replace("/")
+      window.location.replace(`${consoleUrl}/?auth_error=oauth_callback`)
     }
   }, [])
 

@@ -230,7 +230,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     <WelcomeShell>
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col justify-center p-4 lg:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <CeaserLogo size="md" iconSrc="/logo.png" />
+          <CeaserLogo size="md" iconSrc="/console/logo.png" />
           <div className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-muted-foreground md:block">
             Welcome flow {Math.max(stepIndex + 1, 1)} / 7
           </div>

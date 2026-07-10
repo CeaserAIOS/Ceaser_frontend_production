@@ -1,5 +1,6 @@
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown
+  cacheTtlMs?: number
 }
 
 const API_BASE_URL =
@@ -10,6 +11,8 @@ const API_BASE_URL =
 const ACCESS_TOKEN_KEY = "ceaser_access_token"
 const REFRESH_TOKEN_KEY = "ceaser_refresh_token"
 let refreshPromise: Promise<string | null> | null = null
+const CACHE_PREFIX = "ceaser_api_cache:"
+const DEFAULT_CACHE_TTL_MS = 60_000
 
 export function getAccessToken() {
   if (typeof window === "undefined") return null
@@ -80,7 +83,7 @@ function shouldRefresh(path: string) {
 async function request<T>(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
   return fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    signal: options.signal ?? (path.startsWith("/auth/") ? AbortSignal.timeout(10000) : undefined),
+    signal: options.signal ?? AbortSignal.timeout(path.startsWith("/auth/") ? 10000 : 8000),
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -91,8 +94,26 @@ async function request<T>(path: string, options: RequestOptions, accessToken: st
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = String(options.method || "GET").toUpperCase()
+  const cacheable = method === "GET" && canCache(path)
+  const cacheKey = cacheable ? cacheKeyFor(path) : ""
+  const ttl = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
+  if (cacheable) {
+    const cached = readCache<T>(cacheKey, ttl)
+    if (cached.fresh) return cached.value as T
+  }
+
   const accessToken = getAccessToken()
-  let response = await request<T>(path, options, accessToken)
+  let response: Response
+  try {
+    response = await request<T>(path, options, accessToken)
+  } catch (error) {
+    if (cacheable) {
+      const cached = readCache<T>(cacheKey, Number.POSITIVE_INFINITY)
+      if (cached.exists) return cached.value as T
+    }
+    throw error
+  }
 
   if (response.status === 401 && shouldRefresh(path)) {
     const refreshedToken = await refreshAccessToken()
@@ -122,5 +143,51 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  const payload = (await response.json()) as T
+  if (cacheable) writeCache(cacheKey, payload)
+  return payload
+}
+
+function canCache(path: string) {
+  if (typeof window === "undefined") return false
+  if (path.startsWith("/auth/")) return false
+  return [
+    "/agents",
+    "/agent-workbenches",
+    "/automations",
+    "/conversations",
+    "/documents",
+    "/drafts",
+    "/files",
+    "/integrations",
+    "/memories",
+    "/projects",
+    "/voice/settings",
+    "/workflows",
+  ].some((prefix) => path.startsWith(prefix))
+}
+
+function cacheKeyFor(path: string) {
+  const token = getAccessToken() || "anon"
+  return `${CACHE_PREFIX}${token.slice(0, 18)}:${API_BASE_URL}:${path}`
+}
+
+function readCache<T>(key: string, ttlMs: number): { exists: boolean; fresh: boolean; value?: T } {
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return { exists: false, fresh: false }
+    const parsed = JSON.parse(raw) as { savedAt: number; value: T }
+    const fresh = Date.now() - parsed.savedAt <= ttlMs
+    return { exists: true, fresh, value: parsed.value }
+  } catch {
+    return { exists: false, fresh: false }
+  }
+}
+
+function writeCache<T>(key: string, value: T) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), value }))
+  } catch {
+    // Cache is best-effort only.
+  }
 }

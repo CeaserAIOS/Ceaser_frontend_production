@@ -143,6 +143,60 @@ section{position:relative;z-index:1}
 }
 .scroll-line{width:1px;height:60px;background:linear-gradient(to bottom,rgba(0,212,255,0.5),transparent);animation:scrollPulse 2s ease infinite}
 
+/* ===== DESKTOP COMPANION ===== */
+#download{
+  padding:110px 48px 80px;
+  background:linear-gradient(to bottom,rgba(0,212,255,0.04),transparent);
+}
+.download-shell{
+  max-width:1120px;margin:0 auto;
+  display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:stretch;
+}
+.download-panel{
+  position:relative;overflow:hidden;
+  border:1px solid rgba(0,212,255,0.14);
+  background:linear-gradient(135deg,rgba(8,15,30,0.92),rgba(5,8,18,0.84));
+  padding:42px;
+  clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));
+}
+.download-panel::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 20% 10%,rgba(0,212,255,0.16),transparent 34%),
+             radial-gradient(circle at 88% 80%,rgba(123,97,255,0.14),transparent 36%);
+  pointer-events:none;
+}
+.download-content{position:relative;z-index:1}
+.download-kicker{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.28em;
+  color:var(--cyan);text-transform:uppercase;margin-bottom:14px;
+}
+.download-title{
+  font-family:var(--font-head);font-size:clamp(30px,4vw,52px);
+  line-height:1.05;margin-bottom:18px;
+}
+.download-text{color:var(--muted);font-size:15px;line-height:1.8;max-width:620px;margin-bottom:28px}
+.download-actions{display:flex;gap:14px;flex-wrap:wrap}
+.download-card{
+  border:1px solid rgba(180,200,255,0.1);
+  background:rgba(255,255,255,0.035);
+  padding:22px;border-radius:18px;
+}
+.download-card h3{font-family:var(--font-head);font-size:18px;margin-bottom:10px}
+.download-card p{font-size:13px;color:var(--muted);line-height:1.7}
+.download-list{display:grid;gap:14px}
+.download-row{
+  display:flex;gap:14px;align-items:flex-start;
+  border:1px solid rgba(0,212,255,0.09);
+  background:rgba(2,4,8,0.45);
+  padding:16px;border-radius:16px;
+}
+.download-dot{
+  width:10px;height:10px;border-radius:50%;background:var(--cyan);
+  box-shadow:0 0 20px rgba(0,212,255,.75);margin-top:6px;flex:0 0 auto;
+}
+.download-row strong{display:block;font-size:14px;margin-bottom:4px}
+.download-row span{display:block;font-size:12px;color:var(--muted);line-height:1.6}
+
 /* ===== SECTION 2 — PROBLEM ===== */
 #problem{
   padding:120px 48px;min-height:100vh;display:flex;
@@ -403,7 +457,8 @@ footer{
   nav{padding:16px 24px}
   .nav-links{display:none}
   #hero{padding:100px 24px 60px}
-  #problem,#layer,#capabilities,#vision,#waitlist{padding:80px 24px}
+  #problem,#layer,#capabilities,#download,#vision,#waitlist{padding:80px 24px}
+  .download-shell{grid-template-columns:1fr}
   .caps-grid{grid-template-columns:1fr}
   .waitlist-card{padding:48px 32px}
   .vision-stat-row{gap:40px}
@@ -424,8 +479,8 @@ footer{
     <li><a href="#problem"   onclick="scrollToSection('problem');return false;">Vision</a></li>
     <li><a href="#layer"     onclick="scrollToSection('layer');return false;">Intelligence</a></li>
     <li><a href="#capabilities" onclick="scrollToSection('capabilities');return false;">Capabilities</a></li>
+    <li><a href="#download" onclick="scrollToSection('download');return false;">Download</a></li>
     <li><a href="#vision"    onclick="scrollToSection('vision');return false;">Future</a></li>
-    <li><a href="#waitlist"  onclick="scrollToSection('waitlist');return false;">Waitlist</a></li>
   </ul>
   <a href="/console/" class="nav-cta">Go to Console</a>
 </nav>
@@ -441,12 +496,41 @@ footer{
     <p class="hero-body">One intelligence that remembers, learns, plans, creates, automates, and evolves around your life, work, knowledge, and ambitions.</p>
     <div class="hero-btns">
       <button class="btn-primary" onclick="window.location.href='/console/'">Open CEASER</button>
-      <button class="btn-secondary" onclick="scrollToSection('waitlist')">Request Access</button>
+      <button class="btn-secondary" onclick="window.location.href='https://github.com/Akshay301A/ceaser_website/releases/download/v0.1.1/CEASER-Setup-0.1.1.exe'">Download Companion</button>
     </div>
   </div>
   <div class="scroll-hint">
     <span>SCROLL</span>
     <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- DESKTOP COMPANION DOWNLOAD -->
+<section id="download">
+  <div class="download-shell">
+    <div class="download-panel reveal">
+      <div class="download-content">
+        <div class="download-kicker">Desktop Companion</div>
+        <h2 class="download-title">Install CEASER on your desktop.</h2>
+        <p class="download-text">
+          The CEASER companion gives you the always-available overlay, hotkey, voice commands,
+          desktop actions, app launching, music controls, and quick access to the cloud console.
+        </p>
+        <div class="download-actions">
+          <button class="btn-primary" onclick="window.location.href='https://github.com/Akshay301A/ceaser_website/releases/download/v0.1.1/CEASER-Setup-0.1.1.exe'">Download for Windows</button>
+          <button class="btn-secondary" onclick="window.location.href='/console/'">Open Console</button>
+        </div>
+      </div>
+    </div>
+    <div class="download-list reveal">
+      <div class="download-card">
+        <h3>What you get</h3>
+        <p>Overlay, global hotkey, tray app, voice assistant, desktop controls, and cloud-connected CEASER access.</p>
+      </div>
+      <div class="download-row"><div class="download-dot"></div><div><strong>Voice-first overlay</strong><span>Press Ctrl + Shift + Space and talk to CEASER from anywhere.</span></div></div>
+      <div class="download-row"><div class="download-dot"></div><div><strong>Desktop actions</strong><span>Open apps, URLs, folders, music, and quick commands without leaving your workflow.</span></div></div>
+      <div class="download-row"><div class="download-dot"></div><div><strong>Cloud console</strong><span>Your chat, memory, files, agents, integrations, and projects stay in the CEASER web console.</span></div></div>
+    </div>
   </div>
 </section>
 
@@ -1177,7 +1261,7 @@ function scrollToSection(id){
 
 // ==================== ACTIVE NAV + PARALLAX ====================
 const navAnchors=document.querySelectorAll('.nav-links a');
-const sectionIds=['hero','problem','layer','capabilities','vision','waitlist'];
+const sectionIds=['hero','download','problem','layer','capabilities','vision','waitlist'];
 
 window.addEventListener('scroll',()=>{
   const sy=window.scrollY;

@@ -5,6 +5,7 @@ import {
   Code2,
   FileText,
   FolderKanban,
+  GraduationCap,
   LayoutDashboard,
   MessageSquare,
   Puzzle,
@@ -252,6 +253,7 @@ export const ceaserEngines: CeaserEngine[] = [
 export const navigationItems: NavigationItem[] = [
   { id: "mission-control", label: "Mission Control", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
+  { id: "student", label: "Student Hub", icon: GraduationCap },
   { id: "agents", label: "Agents", icon: Users },
   { id: "drafts", label: "Workflows", icon: FileText },
   { id: "projects", label: "Projects", icon: FolderKanban },

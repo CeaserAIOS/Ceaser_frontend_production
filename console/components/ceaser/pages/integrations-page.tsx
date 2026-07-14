@@ -26,6 +26,13 @@ export function IntegrationsPage() {
     void loadIntegrations()
   }, [])
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void syncConnectedIntegrations()
+    }, 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [integrations, busyProvider])
+
   async function loadIntegrations() {
     setIsLoading(true)
     try {
@@ -40,15 +47,8 @@ export function IntegrationsPage() {
     try {
       const result = await integrationsApi.connect(provider)
       if (result.auth_url) {
-        const popup = window.open(result.auth_url, "_blank", "noopener,noreferrer")
-        if (popup) {
-          const poll = window.setInterval(() => {
-            if (popup.closed) {
-              window.clearInterval(poll)
-              void loadIntegrations()
-            }
-          }, 1000)
-        }
+        window.location.href = result.auth_url
+        return
       }
       await loadIntegrations()
     } finally {
@@ -83,6 +83,14 @@ export function IntegrationsPage() {
     }
   }
 
+  async function syncConnectedIntegrations() {
+    if (busyProvider) return
+    const connected = integrations.filter((integration) => integration.connected && liveProviders.has(integration.id))
+    if (!connected.length) return
+    await Promise.allSettled(connected.map((integration) => integrationsApi.sync(integration.id)))
+    await loadIntegrations()
+  }
+
   const connectedCount = integrations.filter((integration) => integration.connected).length
 
   return (
@@ -115,7 +123,7 @@ export function IntegrationsPage() {
             const isLive = liveProviders.has(integration.id)
             return (
               <GlowCard key={integration.id} hover glowColor={integration.connected ? "#34f5a3" : "#4f8cff"}>
-                <div className="flex flex-col gap-4">
+                <div className="flex min-h-[190px] flex-col gap-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex gap-3">
                       <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", integration.connected ? "bg-emerald-500/10 text-emerald-400" : "bg-primary/10 text-primary")}>
@@ -129,10 +137,9 @@ export function IntegrationsPage() {
                     <Status status={isLive ? integration.status : "coming_soon"} connected={isLive && integration.connected} />
                   </div>
 
-                  {(integration.account_email || integration.last_sync_at || !isLive || (isLive && credentialsRequired)) && (
+                  {(integration.account_email || !isLive || (isLive && credentialsRequired)) && (
                     <div className="space-y-2 rounded-xl border border-border/70 bg-background/40 p-3 text-xs text-muted-foreground">
                       {integration.account_email && <p className="text-foreground">{integration.account_email}</p>}
-                      {integration.last_sync_at && <p>Last sync: {formatDate(integration.last_sync_at)}</p>}
                       {!isLive && <p className="text-amber-400">Coming soon after Google integrations are validated.</p>}
                       {isLive && credentialsRequired && <p className="text-amber-400">OAuth credentials are missing in backend `.env`.</p>}
                     </div>
@@ -144,7 +151,7 @@ export function IntegrationsPage() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="mt-auto flex flex-wrap gap-2">
                     {!isLive ? (
                       <button disabled className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground opacity-70">
                         Coming Soon

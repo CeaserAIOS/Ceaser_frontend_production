@@ -20,6 +20,7 @@ export type IntegrationId =
 export type AppPage =
   | "mission-control"
   | "chat"
+  | "student"
   | "agents"
   | "drafts"
   | "projects"

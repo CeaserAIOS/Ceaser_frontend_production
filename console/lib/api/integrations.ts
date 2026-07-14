@@ -44,7 +44,7 @@ export const integrationsApi = {
       method: "POST",
       body: {
         code,
-        return_url: typeof window !== "undefined" ? window.location.origin : undefined,
+        return_url: typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined,
       },
     }),
   disconnect: (provider: string) => apiRequest(`/integrations/${provider}/disconnect`, { method: "POST" }),

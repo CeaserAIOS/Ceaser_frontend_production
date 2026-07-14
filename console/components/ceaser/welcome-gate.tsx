@@ -27,6 +27,13 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [useCase, setUseCase] = useState("Founder")
+  const [studentProfile, setStudentProfile] = useState({
+    college: "",
+    course: "",
+    department: "",
+    semester: "",
+    graduationYear: "",
+  })
   const [authBusy, setAuthBusy] = useState(false)
   const [recoveryBusy, setRecoveryBusy] = useState(false)
   const [verificationBusy, setVerificationBusy] = useState(false)
@@ -114,7 +121,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.code === "Space") {
+      if (event.code === "ControlRight") {
         event.preventDefault()
         setHotkeyStatus("detected")
       }
@@ -212,12 +219,24 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
   }
 
   function saveProfile() {
-    window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name.trim() || firstName, email: sessionEmail(session) || email, useCase }))
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
+      name: name.trim() || firstName,
+      email: sessionEmail(session) || email,
+      useCase,
+      ...(useCase === "Student" ? { studentProfile: cleanStudentProfile(studentProfile) } : {}),
+    }))
     setStep("permissions")
   }
 
   function finishOnboarding() {
-    window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name.trim() || firstName, email: sessionEmail(session) || email, useCase, voice: selectedVoice, hotkey: "Ctrl + Shift + Space" }))
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
+      name: name.trim() || firstName,
+      email: sessionEmail(session) || email,
+      useCase,
+      voice: selectedVoice,
+      hotkey: "Hold Right Ctrl",
+      ...(useCase === "Student" ? { studentProfile: cleanStudentProfile(studentProfile) } : {}),
+    }))
     setStep("ready")
   }
 
@@ -230,7 +249,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     <WelcomeShell>
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col justify-center p-4 lg:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <CeaserLogo size="md" />
+          <CeaserLogo size="md" iconSrc="/logo.png" />
           <div className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-muted-foreground md:block">
             Welcome flow {Math.max(stepIndex + 1, 1)} / 7
           </div>
@@ -298,6 +317,15 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                     </button>
                   ))}
                 </div>
+                {useCase === "Student" && (
+                  <div className="grid gap-3 rounded-3xl border border-primary/20 bg-primary/10 p-4 md:grid-cols-2">
+                    <StudentInput label="College" value={studentProfile.college} onChange={(value) => setStudentProfile((current) => ({ ...current, college: value }))} />
+                    <StudentInput label="Course" value={studentProfile.course} onChange={(value) => setStudentProfile((current) => ({ ...current, course: value }))} />
+                    <StudentInput label="Department" value={studentProfile.department} onChange={(value) => setStudentProfile((current) => ({ ...current, department: value }))} />
+                    <StudentInput label="Semester" value={studentProfile.semester} onChange={(value) => setStudentProfile((current) => ({ ...current, semester: value }))} />
+                    <StudentInput label="Graduation year" value={studentProfile.graduationYear} onChange={(value) => setStudentProfile((current) => ({ ...current, graduationYear: value }))} />
+                  </div>
+                )}
                 <PrimaryButton onClick={saveProfile}>Continue</PrimaryButton>
               </StepPanel>
             )}
@@ -315,10 +343,10 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
             {step === "hotkey" && (
               <StepPanel eyebrow="Desktop" title="Your CEASER hotkey" text="The global overlay shortcut works when the CEASER desktop companion is running. You can test the key combination here before continuing.">
                 <div className="rounded-3xl border border-primary/20 bg-primary/10 p-6 text-center">
-                  <p className="text-sm text-muted-foreground">Default hotkey</p>
-                  <p className="mt-2 text-3xl font-bold tracking-wide text-primary">Ctrl + Shift + Space</p>
+                  <p className="text-sm text-muted-foreground">Hold key</p>
+                  <p className="mt-2 text-3xl font-bold tracking-wide text-primary">Hold Right Ctrl</p>
                   <p className={cn("mt-3 text-sm", hotkeyStatus === "detected" ? "text-emerald-300" : "text-muted-foreground")}>
-                    {hotkeyStatus === "detected" ? "Hotkey detected. The desktop companion uses this shortcut globally." : "Press Ctrl + Shift + Space now to test the shortcut."}
+                    {hotkeyStatus === "detected" ? "Hold key detected. Hold it, speak, then release to run the command." : "Hold Right Ctrl while speaking. Release it when you are done."}
                   </p>
                 </div>
                 <PrimaryButton onClick={() => setStep("voice")}>Continue</PrimaryButton>
@@ -432,6 +460,29 @@ function PermissionCard({ icon: Icon, title, status, action }: { icon: typeof Mi
       )}
     </div>
   )
+}
+
+function StudentInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm outline-none ring-primary/30 focus:ring-2"
+      />
+    </label>
+  )
+}
+
+function cleanStudentProfile(profile: { college: string; course: string; department: string; semester: string; graduationYear: string }) {
+  return {
+    college: profile.college.trim(),
+    course: profile.course.trim(),
+    department: profile.department.trim(),
+    semester: profile.semester.trim(),
+    graduationYear: profile.graduationYear.trim(),
+  }
 }
 
 function preferredVoice(voices: SpeechSynthesisVoice[]) {

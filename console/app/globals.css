@@ -163,6 +163,41 @@
       radial-gradient(circle at 88% 6%, rgba(124, 92, 255, 0.10), transparent 30rem),
       linear-gradient(135deg, #f8fbff 0%, #eef4ff 46%, #e7effc 100%);
   }
+
+  select {
+    color-scheme: dark;
+    background:
+      linear-gradient(45deg, transparent 50%, rgba(203, 213, 225, 0.9) 50%) calc(100% - 18px) 50% / 7px 7px no-repeat,
+      linear-gradient(135deg, rgba(203, 213, 225, 0.9) 50%, transparent 50%) calc(100% - 13px) 50% / 7px 7px no-repeat,
+      linear-gradient(145deg, rgba(17, 24, 39, 0.96), rgba(8, 13, 28, 0.96));
+    border: 1px solid rgba(124, 92, 255, 0.45);
+    border-radius: 12px;
+    padding-right: 42px;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  select option {
+    background: #0b0d18;
+    color: #f8fafc;
+  }
+
+  select option:disabled {
+    color: #7b8498;
+  }
+
+  :root.light select {
+    color-scheme: light;
+    background:
+      linear-gradient(45deg, transparent 50%, rgba(71, 85, 105, 0.9) 50%) calc(100% - 18px) 50% / 7px 7px no-repeat,
+      linear-gradient(135deg, rgba(71, 85, 105, 0.9) 50%, transparent 50%) calc(100% - 13px) 50% / 7px 7px no-repeat,
+      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(238, 244, 255, 0.98));
+  }
+
+  :root.light select option {
+    background: #ffffff;
+    color: #071126;
+  }
 }
 
 /* Glow effects */

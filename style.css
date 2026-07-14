@@ -296,19 +296,17 @@ p{ margin:0; }
   filter: drop-shadow(0 0 10px rgba(108,99,255,.35));
   animation: intent-progress 7.5s cubic-bezier(.65,0,.25,1) infinite;
 }
+.intent-line .train{
+  fill:#22d3ee;
+  stroke:#ffffff;
+  stroke-width:1.5;
+  filter:
+    drop-shadow(0 0 8px rgba(34,211,238,.95))
+    drop-shadow(0 0 18px rgba(108,99,255,.85))
+    drop-shadow(0 0 28px rgba(139,92,246,.55));
+}
 .intent-line circle.node{ fill: var(--bg-panel); stroke: var(--border-strong); stroke-width:1.5; }
 .intent-line .node-label{ font-family: var(--font-mono); font-size:11px; fill: var(--text-tertiary); letter-spacing:.04em; }
-.intent-line .node{
-  transform-box: fill-box;
-  transform-origin:center;
-  animation: intent-node 7.5s ease-in-out infinite;
-}
-.intent-line .node-label{ animation: intent-label 7.5s ease-in-out infinite; }
-.intent-line .node-1,.intent-line .label-1{ animation-delay:0s; }
-.intent-line .node-2,.intent-line .label-2{ animation-delay:1.5s; }
-.intent-line .node-3,.intent-line .label-3{ animation-delay:3s; }
-.intent-line .node-4,.intent-line .label-4{ animation-delay:4.5s; }
-.intent-line .node-5,.intent-line .label-5{ animation-delay:6s; }
 @keyframes intent-progress{
   0%{ stroke-dashoffset:1040; filter: drop-shadow(0 0 8px rgba(108,99,255,.25)); }
   18%{ stroke-dashoffset:790; filter: drop-shadow(0 0 12px rgba(108,99,255,.42)); }
@@ -317,14 +315,6 @@ p{ margin:0; }
   76%{ stroke-dashoffset:0; filter: drop-shadow(0 0 18px rgba(34,211,238,.5)); }
   88%{ stroke-dashoffset:0; opacity:1; }
   100%{ stroke-dashoffset:1040; opacity:.45; }
-}
-@keyframes intent-node{
-  0%,16%,100%{ fill:var(--bg-panel); stroke:var(--border-strong); transform:scale(1); filter:none; }
-  7%,12%{ fill:#111827; stroke:#22d3ee; transform:scale(1.32); filter:drop-shadow(0 0 12px rgba(34,211,238,.7)); }
-}
-@keyframes intent-label{
-  0%,16%,100%{ fill:var(--text-tertiary); }
-  7%,12%{ fill:#e9faff; }
 }
 
 /* ---------- Pain points / problem grid ---------- */

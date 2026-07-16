@@ -12,6 +12,9 @@ await writeFile(path.join(output, "index.html"), sourceHtml.replaceAll("__CEASER
 for (const file of ["style.css", "animations.js", "privacy.html", "terms.html", "launching-soon.html", "favicon.png", "ceaser-wordmark.png", "ceaser-logo-full.png"]) {
   await cp(path.join(root, file), path.join(output, file))
 }
+await cp(path.join(root, "assets"), path.join(output, "assets"), {
+  recursive: true,
+})
 const configJs = await readFile(path.join(root, "config.js"), "utf8")
 await writeFile(path.join(output, "config.js"), configJs.replaceAll("__CEASER_LAUNCHED__", isLaunched ? "true" : "false"))
 

@@ -31,7 +31,12 @@ type Filter = "all" | "connected" | "available" | "account" | "permissions"
 
 const liveProviders = new Set(["google-calendar", "gmail", "google-drive", "google-tasks", "google-classroom"])
 
-const extraProviders: IntegrationRecord[] = [
+const fallbackProviders: IntegrationRecord[] = [
+  providerStub("gmail", "Gmail", "Read inbox metadata, unread email, important email, and labels.", "not_connected"),
+  providerStub("google-calendar", "Google Calendar", "Read calendars, events, upcoming schedule, and event details.", "not_connected"),
+  providerStub("google-drive", "Google Drive", "Read Drive file metadata and supported document content.", "not_connected"),
+  providerStub("google-tasks", "Google Tasks", "Read task lists, tasks, and due dates.", "not_connected"),
+  providerStub("google-classroom", "Google Classroom", "Read courses, coursework, assignments, and due dates.", "not_connected"),
   providerStub("notion", "Notion", "Sync notes, docs and knowledge.", "available"),
   providerStub("slack", "Slack", "Send messages and get updates in Slack.", "coming_soon"),
   providerStub("microsoft-outlook", "Microsoft Outlook", "Sync emails, contacts and calendar.", "coming_soon"),
@@ -136,7 +141,8 @@ export function IntegrationsPage() {
 
   const allIntegrations = useMemo(() => {
     const byId = new Map<string, IntegrationRecord>()
-    for (const item of [...integrations, ...extraProviders]) byId.set(item.id, item)
+    for (const item of fallbackProviders) byId.set(item.id, item)
+    for (const item of integrations) byId.set(item.id, item)
     return Array.from(byId.values())
   }, [integrations])
 

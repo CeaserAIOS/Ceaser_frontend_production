@@ -83,9 +83,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = window.localStorage.getItem("ceaser_theme")
     if (stored === "light" || stored === "dark") setThemeState(stored)
-    const view = new URLSearchParams(window.location.search).get("view")
+    const params = new URLSearchParams(window.location.search)
+    const view = params.get("view") || window.localStorage.getItem("ceaser_current_page")
     if (view) setCurrentPage(view as AppPage)
   }, [])
+
+  const setPage = (page: AppPage) => {
+    setCurrentPage(page)
+    if (typeof window === "undefined") return
+    window.localStorage.setItem("ceaser_current_page", page)
+    const url = new URL(window.location.href)
+    url.searchParams.set("view", page)
+    window.history.replaceState({}, "", url)
+  }
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light")
@@ -100,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         currentPage,
-        setCurrentPage,
+        setCurrentPage: setPage,
         selectedAgentId,
         setSelectedAgentId,
         isVoiceModalOpen,

@@ -159,7 +159,6 @@ function canCache(path: string) {
     "/documents",
     "/drafts",
     "/files",
-    "/integrations",
     "/memories",
     "/projects",
     "/voice/settings",

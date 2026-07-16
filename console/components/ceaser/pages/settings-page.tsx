@@ -9,6 +9,7 @@ import { SystemStatusCard } from "../system-status-card"
 import { authApi } from "@/lib/api/auth"
 import { getAccessToken } from "@/lib/api/client"
 import { commercialApi, type CommercialOverview, type CommercialPlan } from "@/lib/api/commercial"
+import { filesApi, type FileRecord } from "@/lib/api/files"
 import { voiceApi, type VoiceSettingsRecord } from "@/lib/api/voice"
 import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
@@ -28,7 +29,8 @@ import {
   Unplug,
   CreditCard,
   GraduationCap,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from "lucide-react"
 
 const settingsSections = [
@@ -123,7 +125,8 @@ export function SettingsPage() {
   const [commercialMessage, setCommercialMessage] = useState("")
   const [studentEmail, setStudentEmail] = useState("")
   const [studentOtp, setStudentOtp] = useState("")
-  const [studentDocumentId, setStudentDocumentId] = useState("")
+  const [studentDocumentFile, setStudentDocumentFile] = useState<File | null>(null)
+  const [uploadedStudentDocument, setUploadedStudentDocument] = useState<FileRecord | null>(null)
   const [pendingVerificationId, setPendingVerificationId] = useState("")
 
   useEffect(() => {
@@ -250,15 +253,17 @@ export function SettingsPage() {
   }
 
   async function submitStudentDocument() {
-    if (!studentDocumentId.trim()) {
-      setCommercialMessage("Enter the uploaded student ID file id first.")
+    if (!studentDocumentFile && !uploadedStudentDocument) {
+      setCommercialMessage("Choose your student ID document first.")
       return
     }
     setCommercialBusy("student-document")
     setCommercialMessage("")
     try {
-      await commercialApi.submitStudentDocument(studentDocumentId.trim())
-      setStudentDocumentId("")
+      const uploaded = uploadedStudentDocument ?? await filesApi.upload(studentDocumentFile as File)
+      setUploadedStudentDocument(uploaded)
+      await commercialApi.submitStudentDocument(uploaded.id)
+      setStudentDocumentFile(null)
       setCommercialMessage("Student document submitted for manual review.")
       await loadCommercialData()
     } catch (error) {
@@ -648,13 +653,23 @@ export function SettingsPage() {
 
                 <div className="space-y-3">
                   <h3 className="font-semibold">Private Document Fallback</h3>
-                  <p className="text-sm text-muted-foreground">For students without approved institutional email. Upload ID in Files, then paste its file id here.</p>
-                  <input
-                    value={studentDocumentId}
-                    onChange={(event) => setStudentDocumentId(event.target.value)}
-                    placeholder="Uploaded student ID file id"
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                  />
+                  <p className="text-sm text-muted-foreground">For students without approved institutional email. Upload your student ID here and submit it for review.</p>
+                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-background/50 px-4 py-5 text-center transition hover:border-primary/60 hover:bg-primary/5">
+                    <Upload className="mb-2 h-5 w-5 text-primary" />
+                    <span className="text-sm font-semibold text-foreground">
+                      {studentDocumentFile?.name || uploadedStudentDocument?.name || "Choose student ID document"}
+                    </span>
+                    <span className="mt-1 text-xs text-muted-foreground">PDF, image, or document. It will be uploaded and submitted in one step.</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                      className="hidden"
+                      onChange={(event) => {
+                        setStudentDocumentFile(event.target.files?.[0] ?? null)
+                        setUploadedStudentDocument(null)
+                      }}
+                    />
+                  </label>
                   <button
                     onClick={() => void submitStudentDocument()}
                     disabled={commercialBusy === "student-document"}

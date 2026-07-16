@@ -16,8 +16,9 @@
     DOWNLOAD_URL: "/downloads/",
     CONTACT_EMAIL: "hello@ceaser.tech",
     SUPPORT_EMAIL: "support@ceaser.tech",
+    ADMIN_BYPASS_KEYS: ["admin", "founder", "demo"],
     PROTECTED_ROUTES: [
-      "/console", "/dashboard", "/app", "/chat", "/projects",
+      "/dashboard", "/app", "/chat", "/projects",
       "/files", "/memory", "/agents", "/settings", "/admin",
       "/developer", "/internal", "/downloads"
     ],

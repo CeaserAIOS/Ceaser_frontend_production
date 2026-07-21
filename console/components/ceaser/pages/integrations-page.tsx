@@ -249,7 +249,7 @@ export function IntegrationsPage() {
                     </>
                   ) : (
                     <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className="rounded-xl bg-gradient-to-r from-blue-500 to-violet-600 px-5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                      {liveProviders.has(selected.id) ? "Connect" : "Coming Soon"}
+                      {liveProviders.has(selected.id) ? "Connect" : "Future Update"}
                     </button>
                   )}
                 </div>

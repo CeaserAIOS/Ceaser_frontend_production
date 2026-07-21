@@ -513,7 +513,7 @@ export function SettingsPage() {
                   <RangeSetting label="Volume" value={voiceSettings?.speech_volume ?? 1} min={0} max={1} step={0.05} onChange={(value) => void saveVoiceSettings({ speech_volume: value })} />
                 </div>
                 <button onClick={testVoice} className="w-fit rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15">
-                  Test Voice
+                  Play Voice Sample
                 </button>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Language</label>
@@ -550,7 +550,7 @@ export function SettingsPage() {
                       <span className="font-medium">{integration.name}</span>
                     </div>
                     <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground">
-                      {integration.live ? "Not connected" : "Coming soon"}
+                      {integration.live ? "Not connected" : "Future update"}
                     </span>
                   </div>
                 </GlowCard>
@@ -564,7 +564,7 @@ export function SettingsPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold">Billing & Student Access</h2>
-                <p className="text-muted-foreground">Demo-safe controls for plans, student verification, and usage limits.</p>
+                <p className="text-muted-foreground">Manage plans, student verification, and usage limits.</p>
               </div>
               <button
                 onClick={() => void loadCommercialData()}
@@ -593,7 +593,7 @@ export function SettingsPage() {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <MetricCard label="Billing" value={commercialOverview?.subscription?.billing_interval || "Free"} />
                   <MetricCard label="Student Price" value={commercialOverview?.student_pricing_available ? "Available" : "Locked"} />
-                  <MetricCard label="Provider" value={commercialOverview?.subscription?.provider || "Test"} />
+                  <MetricCard label="Provider" value={commercialOverview?.subscription?.provider || "CEASER"} />
                 </div>
               </GlowCard>
 
@@ -620,7 +620,7 @@ export function SettingsPage() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-3">
                   <h3 className="font-semibold">Instant NHCE Email Verification</h3>
-                  <p className="text-sm text-muted-foreground">Allowed V1 domain: newhorizonindia.edu. Test OTP is currently wired for backend validation.</p>
+                  <p className="text-sm text-muted-foreground">Allowed student domain: newhorizonindia.edu. Enter the verification code to confirm eligibility.</p>
                   <input
                     value={studentEmail}
                     onChange={(event) => setStudentEmail(event.target.value)}
@@ -700,14 +700,14 @@ export function SettingsPage() {
                         disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-monthly`}
                         className="flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        Test Monthly
+                        Activate Monthly
                       </button>
                       <button
                         onClick={() => void runTestUpgrade(plan.code, "annual")}
                         disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-annual`}
                         className="flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        Test Annual
+                        Activate Annual
                       </button>
                     </div>
                   </div>
@@ -754,10 +754,10 @@ export function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Model Provider</p>
-                    <p className="text-sm text-muted-foreground">Gemini is active. OpenAI, Claude, and Groq are prepared for future switching.</p>
+                    <p className="text-sm text-muted-foreground">AI requests are routed securely through the CEASER backend.</p>
                   </div>
                   <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                    Gemini
+                    Active
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -904,7 +904,7 @@ export function SettingsPage() {
                 <InfoRow label="Release Notes" value="Coming with packaged release" />
                 <InfoRow label="Terms of Service" value="Prepared for launch assets" />
                 <InfoRow label="Privacy Policy" value="Prepared for launch assets" />
-                <InfoRow label="Support" value="Founder-led support for demo build" />
+                <InfoRow label="Support" value="Founder-led support for launch users" />
               </div>
             </GlowCard>
           </div>

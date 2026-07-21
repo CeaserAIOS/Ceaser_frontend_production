@@ -275,7 +275,7 @@ export function MemoryPage() {
                       <Search className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <p className="text-lg font-medium">No memories found</p>
-                    <p className="text-sm text-muted-foreground">Memory is now loaded from the backend, not local mock data.</p>
+                    <p className="text-sm text-muted-foreground">Memory is synced securely with your CEASER account.</p>
                   </div>
                 )}
               </div>

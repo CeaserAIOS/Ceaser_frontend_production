@@ -60,7 +60,7 @@ export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
     },
     {
       label: "AI Provider",
-      detail: apiReady ? "Gemini routed through backend" : "Waiting for backend",
+      detail: apiReady ? "AI routed through backend" : "Connecting to CEASER services",
       status: apiReady ? "ready" : "attention",
       icon: Sparkles,
     },
@@ -79,7 +79,7 @@ export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-primary">System Status</p>
           {!compact && <h3 className="mt-1 text-lg font-semibold">Launch readiness</h3>}
         </div>
-        <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Demo Safe</span>
+        <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Standard Mode</span>
       </div>
       <div className={cn("grid gap-2", compact ? "grid-cols-1" : "md:grid-cols-2")}>
         {items.map((item) => {

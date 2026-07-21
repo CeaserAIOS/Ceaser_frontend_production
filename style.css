@@ -220,6 +220,32 @@ p{ margin:0; }
   display:flex; align-items:center; gap:8px;
 }
 .hero-status strong{ color: var(--text-primary); font-weight:600; }
+.trust-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:6px;
+}
+.trust-strip span{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border:1px solid rgba(34,211,238,0.20);
+  border-radius:999px;
+  background:rgba(255,255,255,0.045);
+  color:var(--text-secondary);
+  font-family:var(--font-mono);
+  font-size:11.5px;
+}
+.trust-strip span::before{
+  content:"";
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--grad-line);
+  box-shadow:0 0 12px rgba(34,211,238,0.5);
+}
 
 .hero-video-card{
   position:relative;
@@ -602,6 +628,57 @@ p{ margin:0; }
 .model-card.future{ opacity:.78; border-style:dashed; }
 .model-card ul{ margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:8px; }
 .model-card li{ font-size:13.5px; color:var(--text-secondary); }
+
+/* ---------- Security & Trust ---------- */
+.trust-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:16px;
+}
+@media (max-width:900px){ .trust-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width:620px){ .trust-grid{ grid-template-columns:1fr; } }
+.trust-card{
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:24px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025));
+  min-height:210px;
+  transition:transform var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.trust-card:hover{
+  transform:translateY(-5px);
+  border-color:rgba(34,211,238,0.28);
+}
+.trust-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:44px;
+  height:36px;
+  padding:0 10px;
+  border-radius:12px;
+  background:rgba(108,99,255,0.14);
+  color:var(--cyan);
+  font-family:var(--font-mono);
+  font-size:11px;
+  margin-bottom:18px;
+}
+.trust-card h3{ font-size:19px; margin-bottom:10px; }
+.trust-card p{ color:var(--text-secondary); font-size:14.5px; }
+.trust-roadmap{
+  margin-top:18px;
+  border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);
+  padding:28px;
+  background:var(--grad-soft);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+}
+.trust-roadmap h3{ font-size:24px; margin:12px 0 10px; }
+.trust-roadmap p{ color:var(--text-secondary); max-width:760px; }
+@media (max-width:760px){ .trust-roadmap{ align-items:flex-start; flex-direction:column; } }
 
 /* ---------- Pricing ---------- */
 .pricing-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:18px; }

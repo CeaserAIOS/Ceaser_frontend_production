@@ -9,7 +9,7 @@ await rm(output, { recursive: true, force: true })
 await mkdir(path.join(output, "console"), { recursive: true })
 const sourceHtml = await readFile(path.join(root, "index.html"), "utf8")
 await writeFile(path.join(output, "index.html"), sourceHtml.replaceAll("__CEASER_LAUNCHED__", isLaunched ? "true" : "false"))
-for (const file of ["style.css", "animations.js", "privacy.html", "terms.html", "launching-soon.html", "favicon.png", "ceaser-wordmark.png", "ceaser-logo-full.png"]) {
+for (const file of ["style.css", "animations.js", "privacy.html", "terms.html", "security.html", "launching-soon.html", "favicon.png", "ceaser-wordmark.png", "ceaser-logo-full.png"]) {
   await cp(path.join(root, file), path.join(output, file))
 }
 await cp(path.join(root, "assets"), path.join(output, "assets"), {

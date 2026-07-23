@@ -78,21 +78,64 @@
   }
   document.querySelectorAll("[data-countdown]").forEach(startCountdown);
 
-  /* -------- Form handling (front-end only demo; wire to backend later) -------- */
+  /* -------- Launch waitlist form handling -------- */
   document.querySelectorAll("form[data-launch-form]").forEach(function (form) {
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+
       var card = form.closest(".form-card");
       var success = card ? card.querySelector(".form-success") : null;
       var submitBtn = form.querySelector('button[type="submit"]');
+      var emailInput = form.querySelector('input[name="email"]');
+      var nameInput = form.querySelector('input[name="name"]');
+      var userTypeInput = form.querySelector('select[name="userType"]');
+
+      if (!emailInput || !emailInput.value.trim()) return;
+
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = "Submitting…";
       }
-      setTimeout(function () {
-        form.style.display = "none";
-        if (success) success.classList.add("show");
-      }, 500);
+
+      var payload = {
+        email: emailInput.value.trim()
+      };
+
+      fetch("/api/v1/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            return response.json().then(function (errorBody) {
+              throw new Error(errorBody.detail || "Unable to join the launch list right now.");
+            });
+          }
+          return response.json();
+        })
+        .then(function () {
+          form.style.display = "none";
+          if (success) {
+            success.querySelector("h3").textContent = "🎉 You're officially on the CEASER Launch List.";
+            success.querySelector("p").textContent = "Please check your inbox for your welcome email.";
+            success.classList.add("show");
+          }
+        })
+        .catch(function (error) {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Get Launch Updates";
+          }
+          if (emailInput) {
+            emailInput.setAttribute("aria-invalid", "true");
+          }
+          if (success) {
+            success.querySelector("h3").textContent = "Unable to join right now";
+            success.querySelector("p").textContent = error.message || "Please try again in a moment.";
+            success.classList.add("show");
+          }
+        });
     });
   });
 

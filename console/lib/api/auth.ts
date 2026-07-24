@@ -48,11 +48,13 @@ export const authApi = {
     window.location.href = `${supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`
   },
   signup: async (email: string, password: string) => {
+    clearAuthTokens()
     const session = await apiRequest<AuthSession>("/auth/signup", { method: "POST", body: { email, password } })
     setAuthTokens(session.access_token, session.refresh_token)
     return session
   },
   login: async (email: string, password: string) => {
+    clearAuthTokens()
     const session = await apiRequest<AuthSession>("/auth/login", { method: "POST", body: { email, password } })
     setAuthTokens(session.access_token, session.refresh_token)
     return session

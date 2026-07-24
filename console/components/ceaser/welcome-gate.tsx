@@ -47,13 +47,12 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     let mounted = true
     const safetyTimer = window.setTimeout(() => {
       if (!mounted) return
-      clearAuthTokens()
       setSession(null)
       setOnboardingComplete(false)
       setStep("auth")
-      setMessage("CEASER could not verify the session. Please sign in again.")
+      setMessage("CEASER is taking longer than usual to verify your session. Please wait or sign in again.")
       setIsChecking(false)
-    }, 12000)
+    }, 30000)
     async function checkSession() {
       try {
         authApi.consumeOAuthRedirect()
@@ -75,12 +74,11 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
         setOnboardingComplete(completed)
         setStep(completed ? "ready" : "profile")
       } catch {
-        clearAuthTokens()
         if (!mounted) return
         setSession(null)
         setOnboardingComplete(false)
         setStep("auth")
-        setMessage("Your session expired. Please sign in again.")
+        setMessage("CEASER could not verify your session. Please sign in again if this continues.")
       } finally {
         window.clearTimeout(safetyTimer)
         if (mounted) setIsChecking(false)

@@ -58,7 +58,7 @@ async function refreshAccessToken() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(20000),
     })
       .then(async (response) => {
         if (!response.ok) return null
@@ -83,7 +83,7 @@ function shouldRefresh(path: string) {
 async function request<T>(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
   return fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    signal: options.signal ?? AbortSignal.timeout(path.startsWith("/auth/") ? 10000 : 8000),
+    signal: options.signal ?? AbortSignal.timeout(path.startsWith("/auth/") ? 20000 : 12000),
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),

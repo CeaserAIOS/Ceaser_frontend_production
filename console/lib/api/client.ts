@@ -83,7 +83,7 @@ function shouldRefresh(path: string) {
 async function request<T>(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
   return fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    signal: options.signal ?? AbortSignal.timeout(path.startsWith("/auth/") ? 20000 : 12000),
+    signal: options.signal ?? AbortSignal.timeout(timeoutFor(path)),
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -91,6 +91,20 @@ async function request<T>(path: string, options: RequestOptions, accessToken: st
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   })
+}
+
+function timeoutFor(path: string) {
+  if (path.startsWith("/auth/")) return 20000
+  if (
+    path.startsWith("/ceaser/chat") ||
+    path.startsWith("/chat/") ||
+    path.startsWith("/drafts") ||
+    path.startsWith("/documents") ||
+    path.startsWith("/knowledge/orchestrate")
+  ) {
+    return 60000
+  }
+  return 12000
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {

@@ -101,18 +101,26 @@
         email: emailInput.value.trim()
       };
 
-      fetch("/api/v1/waitlist", {
+      var apiBase = ((window.CEASER_CONFIG && window.CEASER_CONFIG.API_BASE_URL) || "https://ceaser-backend-production.onrender.com").replace(/\/$/, "");
+
+      fetch(apiBase + "/api/v1/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
         .then(function (response) {
-          if (!response.ok) {
-            return response.json().then(function (errorBody) {
-              throw new Error(errorBody.detail || "Unable to join the launch list right now.");
-            });
-          }
-          return response.json();
+          return response.text().then(function (text) {
+            var body = {};
+            try {
+              body = text ? JSON.parse(text) : {};
+            } catch (_error) {
+              body = {};
+            }
+            if (!response.ok) {
+              throw new Error(body.detail || "Unable to join the launch list right now.");
+            }
+            return body;
+          });
         })
         .then(function () {
           form.style.display = "none";

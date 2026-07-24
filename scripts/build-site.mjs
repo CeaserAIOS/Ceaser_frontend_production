@@ -12,6 +12,9 @@ await writeFile(path.join(output, "index.html"), sourceHtml.replaceAll("__CEASER
 for (const file of ["style.css", "animations.js", "privacy.html", "terms.html", "security.html", "launching-soon.html", "favicon.png", "ceaser-wordmark.png", "ceaser-logo-full.png"]) {
   await cp(path.join(root, file), path.join(output, file))
 }
+for (const file of ["logo.png", "logo-light.png", "app-icon.png", "app-icon-light.png"]) {
+  await cp(path.join(root, "console", "public", file), path.join(output, file))
+}
 await cp(path.join(root, "assets"), path.join(output, "assets"), {
   recursive: true,
 })

@@ -14,6 +14,8 @@
     LAUNCH_DATE: launchDate,
     CONSOLE_URL: "/console/",
     DOWNLOAD_URL: "/downloads/",
+    API_BASE_URL: "https://ceaser-backend-production.onrender.com",
+    SUPABASE_URL: "https://rrfqqgxhmimffrcckxay.supabase.co",
     CONTACT_EMAIL: "hello@ceaser.tech",
     SUPPORT_EMAIL: "support@ceaser.tech",
     ADMIN_BYPASS_KEYS: ["admin", "founder", "demo"],

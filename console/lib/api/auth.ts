@@ -32,7 +32,8 @@ export const authApi = {
     return { access_token: accessToken, refresh_token: refreshToken }
   },
   signInWithGoogle: () => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const runtimeConfig = typeof window !== "undefined" ? (window as any).CEASER_CONFIG : undefined
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || runtimeConfig?.SUPABASE_URL || "https://rrfqqgxhmimffrcckxay.supabase.co"
     if (!supabaseUrl || typeof window === "undefined") {
       throw new Error("Google login is not configured.")
     }

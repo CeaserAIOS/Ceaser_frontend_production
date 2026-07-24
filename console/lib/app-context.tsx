@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import type { AppPage } from "@/lib/ceaser"
+import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
 
 type DialogTone = "default" | "danger"
 type AppTheme = "dark" | "light"
@@ -85,15 +86,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (stored === "light" || stored === "dark") setThemeState(stored)
     const params = new URLSearchParams(window.location.search)
     const view = params.get("view") || window.localStorage.getItem("ceaser_current_page")
-    if (view) setCurrentPage(view as AppPage)
+    if (view) setCurrentPage(view === "student" && !ENABLE_STUDENT_HUB ? "mission-control" : (view as AppPage))
   }, [])
 
   const setPage = (page: AppPage) => {
-    setCurrentPage(page)
+    const nextPage = page === "student" && !ENABLE_STUDENT_HUB ? "mission-control" : page
+    setCurrentPage(nextPage)
     if (typeof window === "undefined") return
-    window.localStorage.setItem("ceaser_current_page", page)
+    window.localStorage.setItem("ceaser_current_page", nextPage)
     const url = new URL(window.location.href)
-    url.searchParams.set("view", page)
+    url.searchParams.set("view", nextPage)
     window.history.replaceState({}, "", url)
   }
 

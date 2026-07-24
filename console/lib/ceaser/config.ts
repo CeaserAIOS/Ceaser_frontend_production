@@ -28,6 +28,8 @@ export const ceaserUser = {
   avatar: "/avatar.jpg",
 }
 
+export const ENABLE_STUDENT_HUB = process.env.NEXT_PUBLIC_ENABLE_STUDENT_HUB === "true"
+
 export const ceaserAgents: CeaserAgent[] = [
   {
     id: "ceaser",
@@ -250,7 +252,7 @@ export const ceaserEngines: CeaserEngine[] = [
   },
 ]
 
-export const navigationItems: NavigationItem[] = [
+const baseNavigationItems: NavigationItem[] = [
   { id: "mission-control", label: "Mission Control", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "student", label: "Student Hub", icon: GraduationCap },
@@ -262,6 +264,8 @@ export const navigationItems: NavigationItem[] = [
   { id: "integrations", label: "Integrations", icon: Puzzle },
   { id: "settings", label: "Settings", icon: Settings },
 ]
+
+export const navigationItems: NavigationItem[] = baseNavigationItems.filter((item) => ENABLE_STUDENT_HUB || item.id !== "student")
 
 export const getAgent = (id: string) => ceaserAgents.find((agent) => agent.id === id)
 export const getEngine = (id: string) => ceaserEngines.find((engine) => engine.id === id)

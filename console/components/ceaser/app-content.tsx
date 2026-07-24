@@ -1,6 +1,7 @@
 "use client"
 
 import { useApp } from "@/lib/app-context"
+import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
 import { MissionControl } from "./pages/mission-control"
 import { ChatPage } from "./pages/chat-page"
 import { StudentPage } from "./pages/student-page"
@@ -15,6 +16,10 @@ import { SettingsPage } from "./pages/settings-page"
 
 export function AppContent() {
   const { currentPage } = useApp()
+
+  if (currentPage === "student" && !ENABLE_STUDENT_HUB) {
+    return <MissionControl />
+  }
 
   switch (currentPage) {
     case "mission-control":

@@ -47,16 +47,30 @@ const fallbackProviders: IntegrationRecord[] = [
 ]
 
 export function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState<IntegrationRecord[]>([])
+  const [integrations, setIntegrations] = useState<IntegrationRecord[]>(fallbackProviders)
+  const [optimisticConnected, setOptimisticConnected] = useState<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState("gmail")
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [message, setMessage] = useState("")
 
   useEffect(() => {
-    void loadIntegrations()
+    const params = new URLSearchParams(window.location.search)
+    const provider = params.get("integration")
+    const status = params.get("status")
+
+    if (provider && status === "connected") {
+      setSelectedId(provider)
+      setOptimisticConnected((current) => new Set([...Array.from(current), provider]))
+      setIntegrations((current) =>
+        upsertIntegration(current, provider, { connected: true, status: "connected", last_sync_at: new Date().toISOString() }),
+      )
+      window.history.replaceState({}, "", `${window.location.pathname}?view=integrations`)
+    }
+
+    window.setTimeout(() => void loadIntegrations({ showLoading: false, showErrors: false }), 150)
   }, [])
 
   useEffect(() => {
@@ -66,17 +80,17 @@ export function IntegrationsPage() {
     return () => window.clearInterval(timer)
   }, [integrations, busyProvider])
 
-  async function loadIntegrations() {
-    setIsLoading(true)
-    setMessage("")
+  async function loadIntegrations(options: { showLoading?: boolean; showErrors?: boolean } = {}) {
+    if (options.showLoading) setIsLoading(true)
+    if (options.showErrors) setMessage("")
     try {
       const records = await integrationsApi.list()
-      setIntegrations(records)
+      setIntegrations(mergeFallbacks(records, optimisticConnected))
       if (!records.some((item) => item.id === selectedId)) setSelectedId(records[0]?.id || "gmail")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load integrations.")
+      if (options.showErrors) setMessage(error instanceof Error ? error.message : "Could not load integrations.")
     } finally {
-      setIsLoading(false)
+      if (options.showLoading) setIsLoading(false)
     }
   }
 
@@ -89,7 +103,7 @@ export function IntegrationsPage() {
         window.location.href = result.auth_url
         return
       }
-      await loadIntegrations()
+      await loadIntegrations({ showErrors: true })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not connect integration.")
     } finally {
@@ -100,6 +114,11 @@ export function IntegrationsPage() {
   async function disconnect(provider: string) {
     setBusyProvider(provider)
     setMessage("")
+    setOptimisticConnected((current) => {
+      const next = new Set(current)
+      next.delete(provider)
+      return next
+    })
     setIntegrations((current) =>
       current.map((item) =>
         item.id === provider
@@ -109,10 +128,10 @@ export function IntegrationsPage() {
     )
     try {
       await integrationsApi.disconnect(provider)
-      await loadIntegrations()
+      await loadIntegrations({ showErrors: false })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not disconnect integration.")
-      await loadIntegrations()
+      await loadIntegrations({ showErrors: true })
     } finally {
       setBusyProvider(null)
     }
@@ -123,7 +142,7 @@ export function IntegrationsPage() {
     setMessage("")
     try {
       await integrationsApi.sync(provider)
-      await loadIntegrations()
+      await loadIntegrations({ showErrors: true })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not sync integration.")
     } finally {
@@ -136,15 +155,12 @@ export function IntegrationsPage() {
     const connected = integrations.filter((item) => item.connected && liveProviders.has(item.id))
     if (!connected.length) return
     await Promise.allSettled(connected.map((item) => integrationsApi.sync(item.id)))
-    await loadIntegrations()
+    await loadIntegrations({ showErrors: false })
   }
 
   const allIntegrations = useMemo(() => {
-    const byId = new Map<string, IntegrationRecord>()
-    for (const item of fallbackProviders) byId.set(item.id, item)
-    for (const item of integrations) byId.set(item.id, item)
-    return Array.from(byId.values())
-  }, [integrations])
+    return mergeFallbacks(integrations, optimisticConnected)
+  }, [integrations, optimisticConnected])
 
   const selected = allIntegrations.find((item) => item.id === selectedId) || allIntegrations[0]
   const connectedCount = allIntegrations.filter((item) => item.connected).length
@@ -175,7 +191,7 @@ export function IntegrationsPage() {
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search integrations..." className="w-full bg-transparent outline-none placeholder:text-muted-foreground" />
               </label>
-              <button onClick={() => void loadIntegrations()} disabled={isLoading} className="flex h-12 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-60">
+              <button onClick={() => void loadIntegrations({ showLoading: true, showErrors: true })} disabled={isLoading} className="flex h-12 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-60">
                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                 Refresh All
               </button>
@@ -438,6 +454,31 @@ function providerStub(id: string, name: string, description: string, status: str
     connected: false,
     metadata: {},
   }
+}
+
+function mergeFallbacks(records: IntegrationRecord[], connectedOverrides = new Set<string>()) {
+  const byId = new Map<string, IntegrationRecord>()
+  for (const item of fallbackProviders) byId.set(item.id, item)
+  for (const item of records) byId.set(item.id, item)
+  for (const id of connectedOverrides) {
+    byId.set(id, {
+      ...(byId.get(id) || providerStub(id, providerName(id), "Connected integration.", "connected")),
+      connected: true,
+      status: "connected",
+    })
+  }
+  return Array.from(byId.values())
+}
+
+function upsertIntegration(records: IntegrationRecord[], id: string, updates: Partial<IntegrationRecord>) {
+  const existing = records.find((item) => item.id === id) || fallbackProviders.find((item) => item.id === id) || providerStub(id, providerName(id), "Connected integration.", "connected")
+  const next = { ...existing, ...updates }
+  const without = records.filter((item) => item.id !== id)
+  return [...without, next]
+}
+
+function providerName(id: string) {
+  return fallbackProviders.find((item) => item.id === id)?.name || id
 }
 
 function formatDate(value?: string | null) {

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Analytics } from '@vercel/analytics/next'
 import favicon from '@/public/favicon.png'
 import faviconLight from '@/public/favicon-light.png'
 import appIcon from '@/public/app-icon.png'
@@ -38,7 +37,6 @@ export default function RootLayout({
     <html lang="en" className="bg-background">
       <body className="font-sans antialiased">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

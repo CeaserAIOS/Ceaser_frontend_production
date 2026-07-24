@@ -81,16 +81,23 @@ function shouldRefresh(path: string) {
 }
 
 async function request<T>(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
-  return fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    signal: options.signal ?? AbortSignal.timeout(timeoutFor(path)),
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...options.headers,
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  })
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      signal: options.signal ?? AbortSignal.timeout(timeoutFor(path)),
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...options.headers,
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new ApiError("CEASER is taking longer than expected. Please try again.", 408)
+    }
+    throw error
+  }
 }
 
 function timeoutFor(path: string) {
@@ -102,7 +109,7 @@ function timeoutFor(path: string) {
     path.startsWith("/documents") ||
     path.startsWith("/knowledge/orchestrate")
   ) {
-    return 60000
+    return 90000
   }
   return 12000
 }

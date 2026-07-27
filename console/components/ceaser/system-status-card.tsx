@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { CheckCircle2, CircleDashed, Server, ShieldCheck, Sparkles, Unplug, Mic } from "lucide-react"
 import { getAccessToken } from "@/lib/api/client"
+import { integrationsApi } from "@/lib/api/integrations"
 import { cn } from "@/lib/utils"
 
 type StatusState = "ready" | "attention" | "not-connected"
@@ -22,6 +23,7 @@ const API_BASE_URL =
 export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
   const [apiReady, setApiReady] = useState<boolean | null>(null)
   const [voiceReady, setVoiceReady] = useState(false)
+  const [connectedIntegrations, setConnectedIntegrations] = useState<number | null>(null)
   const signedIn = Boolean(getAccessToken())
 
   useEffect(() => {
@@ -34,6 +36,13 @@ export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
         if (!cancelled) setApiReady(false)
       })
     setVoiceReady(typeof window !== "undefined" && "speechSynthesis" in window)
+    void integrationsApi.list()
+      .then((records) => {
+        if (!cancelled) setConnectedIntegrations(records.filter((integration) => integration.connected).length)
+      })
+      .catch(() => {
+        if (!cancelled) setConnectedIntegrations(0)
+      })
     return () => {
       cancelled = true
     }
@@ -66,8 +75,8 @@ export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
     },
     {
       label: "Integrations",
-      detail: "Not connected",
-      status: "not-connected",
+      detail: connectedIntegrations === null ? "Checking" : `${connectedIntegrations} connected`,
+      status: connectedIntegrations && connectedIntegrations > 0 ? "ready" : "attention",
       icon: Unplug,
     },
   ]

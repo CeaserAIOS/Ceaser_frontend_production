@@ -143,6 +143,7 @@ export function ChatPage() {
   const [showSavedResponses, setShowSavedResponses] = useState(false)
   const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -164,36 +165,56 @@ export function ChatPage() {
   }, [savedResponses, searchQuery])
 
   const loadMessages = useCallback(async (conversationId: string) => {
-    const records = await chatApi.listMessages(conversationId)
-    setMessages(
-      records.map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        timestamp: formatTime(message.created_at),
-        ...richMessageFields(message),
-      })),
-    )
+    try {
+      const records = await chatApi.listMessages(conversationId)
+      setMessages(
+        records.map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          timestamp: formatTime(message.created_at),
+          ...richMessageFields(message),
+        })),
+      )
+      setLoadError(null)
+    } catch (error) {
+      setMessages([])
+      setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
+    }
   }, [])
 
   const loadConversations = useCallback(async (preferredConversationId?: string | null) => {
-    const records = await chatApi.listConversations(showArchivedChats)
-    setConversations(records)
-    const selected = records.find((item) => item.id === preferredConversationId) ?? records[0]
-    if (selected) {
-      setActiveConversationId(selected.id)
-      window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, selected.id)
-      await loadMessages(selected.id)
-    } else {
+    try {
+      const records = await chatApi.listConversations(showArchivedChats)
+      setConversations(records)
+      const selected = records.find((item) => item.id === preferredConversationId) ?? records[0]
+      if (selected) {
+        setActiveConversationId(selected.id)
+        window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, selected.id)
+        await loadMessages(selected.id)
+      } else {
+        setActiveConversationId(null)
+        setMessages([])
+        window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
+      }
+      setLoadError(null)
+    } catch (error) {
+      setConversations([])
       setActiveConversationId(null)
       setMessages([])
       window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
+      setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
     }
   }, [loadMessages, showArchivedChats])
 
   const refreshConversationList = useCallback(async () => {
-    const records = await chatApi.listConversations(showArchivedChats)
-    setConversations(records)
+    try {
+      const records = await chatApi.listConversations(showArchivedChats)
+      setConversations(records)
+      setLoadError(null)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Conversation list is still loading.")
+    }
   }, [showArchivedChats])
 
   useEffect(() => {
@@ -720,6 +741,11 @@ export function ChatPage() {
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6">
           <div className={cn("min-h-0 flex-1 overflow-y-auto pr-3", messages.length || isBooting ? "pt-10" : "pt-[17vh]")}>
+            {loadError && (
+              <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                {loadError}
+              </div>
+            )}
             {!messages.length && !isBooting ? (
               <>
                 <h1 className="text-left text-[38px] font-light leading-[1.08] tracking-[-0.03em] text-white md:text-[44px]">

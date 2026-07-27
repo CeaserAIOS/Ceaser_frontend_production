@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState } from "react"
 import { user } from "@/lib/data"
@@ -16,9 +16,7 @@ import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { 
   User, 
-  Mic, 
-  Puzzle, 
-  Shield, 
+  Mic, Shield, 
   Sliders,
   Info,
   Moon,
@@ -27,7 +25,7 @@ import {
   Key,
   Smartphone,
   Activity,
-  Unplug,
+  
   CreditCard,
   GraduationCap,
   RefreshCw,
@@ -53,12 +51,8 @@ const settingsSections = [
     icon: Mic,
     description: "Voice & speech settings"
   },
-  { 
-    id: "integrations", 
-    label: "Integrations", 
-    icon: Puzzle,
-    description: "Connected apps & services"
-  },
+
+
   {
     id: "billing",
     label: "Billing & Student Access",
@@ -85,14 +79,7 @@ const settingsSections = [
   }
 ]
 
-const connectableIntegrations = [
-  { name: "Google Calendar", live: true },
-  { name: "Gmail", live: true },
-  { name: "Google Drive", live: true },
-  { name: "Google Tasks", live: true },
-  { name: "Google Classroom", live: true },
-  { name: "Notion", live: false },
-]
+
 const PROFILE_KEY = "ceaser_user_profile"
 const PREFERENCES_KEY = "ceaser_preferences"
 const roleOptions = [
@@ -419,54 +406,90 @@ export function SettingsPage() {
         )}
 
         {activeSection === "profile" && (
-          <div className="max-w-2xl space-y-6">
+          <div className="max-w-5xl space-y-6">
             <h2 className="text-2xl font-bold">Profile</h2>
-            
-            <GlowCard>
-              <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-bold text-primary">
-                  {displayName.charAt(0)}
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">{displayName}</h3>
-                  <p className="text-muted-foreground">{displayRole}</p>
-                </div>
-              </div>
-            </GlowCard>
 
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium">Full Name</label>
-                <input
-                  type="text"
-                  value={profileDraft.name}
-                  onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2 outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium">Email</label>
-                <input
-                  type="email"
-                  value={profileDraft.email}
-                  onChange={(event) => setProfileDraft((current) => ({ ...current, email: event.target.value }))}
-                  placeholder={displayEmail}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2 outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium">Role</label>
-                <CeaserSelect
-                  value={profileDraft.useCase}
-                  onValueChange={(value) => setProfileDraft((current) => ({ ...current, useCase: value }))}
-                  options={roleOptions}
-                />
-              </div>
+            <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+              <GlowCard>
+                <div className="flex h-full flex-col justify-between gap-6">
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/35 via-primary/20 to-cyan-400/10 text-2xl font-bold text-primary shadow-[0_16px_40px_rgba(79,140,255,0.18)]">
+                        {displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm uppercase tracking-[0.22em] text-primary/80">Account Identity</p>
+                        <h3 className="truncate text-2xl font-semibold">{displayName}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{displayRole}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Display name</span>
+                        <span className="max-w-[55%] truncate text-sm font-medium">{profileDraft.name || displayName}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Email</span>
+                        <span className="max-w-[55%] truncate text-sm font-medium">{profileDraft.email || displayEmail}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">Role</span>
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{profileDraft.useCase}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </GlowCard>
+
+              <GlowCard>
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold">Edit Profile</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Update your identity, contact details, and working style in one place.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-medium">Full Name</label>
+                      <input
+                        type="text"
+                        value={profileDraft.name}
+                        onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))}
+                        className="w-full rounded-2xl border border-border bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-medium">Email</label>
+                      <input
+                        type="email"
+                        value={profileDraft.email}
+                        onChange={(event) => setProfileDraft((current) => ({ ...current, email: event.target.value }))}
+                        placeholder={displayEmail}
+                        className="w-full rounded-2xl border border-border bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-medium">Role</label>
+                      <CeaserSelect
+                        value={profileDraft.useCase}
+                        onValueChange={(value) => setProfileDraft((current) => ({ ...current, useCase: value }))}
+                        options={roleOptions}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-muted-foreground">Your profile updates are saved locally and reflected across the app instantly.</p>
+                    <button onClick={saveProfile} className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
+                      Save Profile
+                    </button>
+                  </div>
+                </div>
+              </GlowCard>
             </div>
-
-            <button onClick={saveProfile} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
-              Save Profile
-            </button>
           </div>
         )}
 
@@ -534,33 +557,7 @@ export function SettingsPage() {
             </GlowCard>
           </div>
         )}
-
-        {activeSection === "integrations" && (
-          <div className="max-w-2xl space-y-6">
-            <h2 className="text-2xl font-bold">Integrations</h2>
-            <p className="text-muted-foreground">Connect your favorite apps and services from the Integrations page. Nothing is shown as connected until OAuth is complete.</p>
-            
-            <div className="space-y-3">
-              {connectableIntegrations.map((integration) => (
-                <GlowCard key={integration.name}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                        <Unplug className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <span className="font-medium">{integration.name}</span>
-                    </div>
-                    <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground">
-                      {integration.live ? "Not connected" : "Future update"}
-                    </span>
-                  </div>
-                </GlowCard>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeSection === "billing" && (
+{activeSection === "billing" && (
           <div className="max-w-5xl space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>

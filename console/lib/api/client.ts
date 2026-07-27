@@ -105,11 +105,12 @@ function timeoutFor(path: string) {
   if (
     path.startsWith("/ceaser/chat") ||
     path.startsWith("/chat/") ||
+    path.startsWith("/conversations") ||
     path.startsWith("/drafts") ||
     path.startsWith("/documents") ||
     path.startsWith("/knowledge/orchestrate")
   ) {
-    return 90000
+    return 180000
   }
   return 12000
 }

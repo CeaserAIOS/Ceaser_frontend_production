@@ -26,6 +26,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+  window.CEASER_FLAGS = {
+    trust: false,
+    pricing: false,
+    institutions: false,
+  };
+</script>
 </head>
 <body>
 
@@ -43,15 +50,14 @@
       <a href="#product">Product</a>
       <a href="#features">Features</a>
       <a href="#students">Students</a>
-      <a href="#institutions">Institutions</a>
-      <a href="#trust">Trust</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#institutions" data-feature="institutions">Institutions</a>
+      <a href="#trust" data-feature="trust">Trust</a>
+      <a href="#pricing" data-feature="pricing">Pricing</a>
       <a href="#about">About</a>
     </nav>
 
     <div class="nav-right">
       <span class="badge-soon"><span class="dot" aria-hidden="true"></span>Launching Soon</span>
-      <a href="#launch" class="btn btn-primary btn-sm">Get Launch Updates</a>
       <button class="nav-toggle btn-ghost btn-sm" style="border-radius:8px;" aria-label="Toggle menu" aria-expanded="false">☰</button>
     </div>
   </div>
@@ -60,11 +66,10 @@
       <a href="#product">Product</a>
       <a href="#features">Features</a>
       <a href="#students">Students</a>
-      <a href="#institutions">Institutions</a>
-      <a href="#trust">Trust</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#institutions" data-feature="institutions">Institutions</a>
+      <a href="#trust" data-feature="trust">Trust</a>
+      <a href="#pricing" data-feature="pricing">Pricing</a>
       <a href="#about">About</a>
-      <a href="#launch" class="btn btn-primary btn-sm" style="align-self:flex-start;">Get Launch Updates</a>
     </div>
   </div>
 </header>
@@ -83,13 +88,12 @@
         complete real work across voice, chat, projects, documents, files, and your desktop.
       </p>
       <div class="hero-ctas reveal-load" style="animation-delay:.34s">
-        <a href="#launch" class="btn btn-primary">Get Launch Updates</a>
-        <a href="#preview" class="btn btn-ghost">See CEASER in Action</a>
+        
       </div>
-      <div class="hero-status reveal-load" style="animation-delay:.42s">
+      <!--<div class="hero-status reveal-load" style="animation-delay:.42s">
         Public Launch — <strong>30 July 2026</strong>
-      </div>
-      <div class="trust-strip reveal-load" style="animation-delay:.48s" aria-label="Trust indicators">
+      </div>-->
+      <div class="trust-strip reveal-load" style="animation-delay:.48s" aria-label="Trust indicators" data-feature="trust">
         <span>Built on Enterprise Infrastructure</span>
         <span>Privacy by Design</span>
         <span>Encrypted Communications</span>
@@ -428,8 +432,6 @@
           <li>Early access to selected student features</li>
           <li>Participation in approved beta and feedback programs</li>
         </ul>
-
-        <a href="#launch" class="btn btn-primary">Get Student Launch Updates</a>
         <p class="fine-note">Eligibility and verification requirements apply. Student pricing is intended for active students at recognized educational institutions.</p>
       </div>
 
@@ -445,7 +447,7 @@
   </section>
 
   <!-- ================= ACADEMIC PARTNERSHIPS ================= -->
-  <section class="section" id="institutions">
+  <section class="section" id="institutions" data-feature="institutions">
     <div class="container">
       <div class="section-head reveal">
         <span class="eyebrow">CEASER for Academic Partners</span>
@@ -488,7 +490,7 @@
       </div>
 
       <div class="reveal" style="margin-top:56px; max-width:640px;">
-        <h3 style="font-size:20px; margin-bottom:8px;">Become an Academic Partner</h3>
+        <h3 style="font-size:20px; margin-bottom:8px;">JOIN</h3>
         <p style="color:var(--text-secondary); font-size:14.5px; margin-bottom:24px;">Tell us about your institution and we'll follow up as CEASER approaches launch.</p>
       </div>
 
@@ -525,7 +527,6 @@
           <label for="message">Message</label>
           <textarea id="message" name="message" placeholder="Tell us about your institution and what you're hoping to explore with CEASER."></textarea>
         </div>
-        <button type="submit" class="btn btn-primary form-submit">Become an Academic Partner</button>
         <div class="form-success" role="status">
           <div class="check">✓</div>
           <h3 style="font-size:18px; margin-bottom:8px;">Thank you</h3>
@@ -536,7 +537,7 @@
   </section>
 
   <!-- ================= SECURITY & TRUST ================= -->
-  <section class="section" id="trust">
+  <section class="section" id="trust" data-feature="trust">
     <div class="container">
       <div class="section-head reveal">
         <span class="eyebrow">Security & Trust</span>
@@ -583,13 +584,13 @@
           <h3>Enterprise-ready foundation.</h3>
           <p>Built using secure authentication, encrypted communications, user-isolated workspaces, private document storage, Knowledge Engine access controls, and continuous platform monitoring. Designed to scale from individual creators to institutions and organizations.</p>
         </div>
-        <a href="security.html" class="btn btn-secondary">Open Trust Center</a>
+        <a href="security.html" class="btn btn-secondary" data-feature="trust">Open Trust Center</a>
       </div>
     </div>
   </section>
 
   <!-- ================= PRICING ================= -->
-  <section class="section" id="pricing">
+  <section class="section" id="pricing" data-feature="pricing">
     <div class="container">
       <div class="section-head reveal">
         <span class="eyebrow">Pricing</span>
@@ -608,7 +609,6 @@
             <li>Limited usage</li>
             <li>Basic chat and workspace experience</li>
           </ul>
-          <a href="#launch" class="btn btn-ghost" style="width:100%;">Get Launch Updates</a>
         </div>
 
         <div class="price-card featured">
@@ -623,7 +623,6 @@
             <li>Projects and productivity capabilities</li>
             <li>Priority feature access where appropriate</li>
           </ul>
-          <a href="#launch" class="btn btn-primary" style="width:100%;">Get Launch Updates</a>
         </div>
 
         <div class="price-card">
@@ -678,7 +677,7 @@
             <option>Other</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-primary form-submit">Get Launch Updates</button>
+        <button type="submit" class="btn btn-primary form-submit">JOIN</button>
         <p class="form-note">No spam. Just launch updates and early access details.</p>
         <div class="form-success" role="status">
           <div class="check">✓</div>
@@ -720,7 +719,6 @@
       <span class="eyebrow">Get Ready</span>
       <h2 style="margin-top:16px;">The future of computing begins with intent.</h2>
       <p class="sub">One intelligence. Every task. One unified workspace.</p>
-      <a href="#launch" class="btn btn-primary">Get Launch Updates</a>
     </div>
   </section>
 
@@ -739,12 +737,12 @@
           <h5>Product</h5>
           <a href="#product">Product</a>
           <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#pricing" data-feature="pricing">Pricing</a>
         </div>
         <div class="footer-col">
           <h5>Education</h5>
           <a href="#students">Student Program</a>
-          <a href="#institutions">Academic Partnerships</a>
+          <a href="#institutions" data-feature="institutions">Academic Partnerships</a>
         </div>
         <div class="footer-col">
           <h5>Company</h5>
@@ -754,7 +752,7 @@
         </div>
         <div class="footer-col">
           <h5>Legal</h5>
-          <a href="security.html">Security & Trust</a>
+          <a href="security.html" data-feature="trust">Security & Trust</a>
           <a href="privacy.html">Privacy Policy</a>
           <a href="terms.html">Terms of Service</a>
         </div>
@@ -780,6 +778,15 @@
         menu.style.maxHeight = isOpen ? "0px" : menu.scrollHeight + "px";
       });
     }
+  });
+</script>
+<script>
+  const flags = window.CEASER_FLAGS || {};
+  Object.entries(flags).forEach(([feature, enabled]) => {
+    if (enabled) return;
+    document.querySelectorAll(`[data-feature="${feature}"]`).forEach((element) => {
+      element.hidden = true;
+    });
   });
 </script>
 </body>

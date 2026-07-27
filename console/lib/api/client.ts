@@ -169,6 +169,70 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload
 }
 
+export async function apiStreamRequest(
+  path: string,
+  options: RequestOptions = {},
+  handlers: {
+    onStatus?: (payload: Record<string, unknown>) => void
+    onToken?: (text: string) => void
+    onComplete?: (payload: Record<string, unknown>) => void
+    onError?: (message: string) => void
+  } = {},
+) {
+  const accessToken = getAccessToken()
+  let response = await request(path, options, accessToken)
+
+  if (response.status === 401 && shouldRefresh(path)) {
+    const refreshedToken = await refreshAccessToken()
+    if (refreshedToken) response = await request(path, options, refreshedToken)
+  }
+
+  if (!response.ok || !response.body) {
+    let message = "We couldn't complete your request. Please try again."
+    try {
+      const payload = await response.json()
+      if (payload?.detail) message = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail)
+    } catch {
+      // Keep friendly message.
+    }
+    throw new ApiError(message, response.status)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  const dispatchEvent = (raw: string) => {
+    const lines = raw.split("\n")
+    const eventName = lines.find((line) => line.startsWith("event:"))?.replace("event:", "").trim()
+    const dataLine = lines.find((line) => line.startsWith("data:"))?.replace("data:", "").trim()
+    if (!eventName || !dataLine) return
+    let payload: Record<string, unknown> | string = dataLine
+    try {
+      payload = JSON.parse(dataLine) as Record<string, unknown>
+    } catch {
+      // Some stream events send raw text chunks.
+    }
+    if (eventName === "status" && typeof payload !== "string") handlers.onStatus?.(payload)
+    if (eventName === "token") handlers.onToken?.(typeof payload === "string" ? payload : String(payload.text ?? ""))
+    if (eventName === "complete" && typeof payload !== "string") handlers.onComplete?.(payload)
+    if (eventName === "error") {
+      const message = typeof payload === "string" ? payload : String(payload.message ?? "We couldn't complete your request. Please try again.")
+      handlers.onError?.(message)
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const events = buffer.split("\n\n")
+    buffer = events.pop() ?? ""
+    for (const raw of events) dispatchEvent(raw)
+  }
+  if (buffer.trim()) dispatchEvent(buffer)
+}
+
 function canCache(path: string) {
   if (typeof window === "undefined") return false
   if (path.startsWith("/auth/")) return false

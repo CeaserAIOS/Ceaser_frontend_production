@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { apiRequest, apiStreamRequest } from "./client"
 
 export interface ChatMessage {
   id: string
@@ -84,6 +84,9 @@ export interface ResearchSource {
   url: string
   source: string
   snippet: string
+  excerpt?: string | null
+  publisher?: string | null
+  retrieved_at?: string | null
   score: number
 }
 
@@ -132,4 +135,30 @@ export const chatApi = {
         file_ids: fileIds ?? [],
       },
     }),
+  sendCeaserMessageStream: (
+    message: string,
+    conversationId: string | undefined,
+    fileIds: string[] | undefined,
+    handlers: {
+      onToken?: (text: string) => void
+      onComplete?: (response: CeaserChatResponse) => void
+      onError?: (message: string) => void
+    },
+  ) =>
+    apiStreamRequest(
+      "/ceaser/chat/stream",
+      {
+        method: "POST",
+        body: {
+          message,
+          conversation_id: conversationId,
+          file_ids: fileIds ?? [],
+        },
+      },
+      {
+        onToken: handlers.onToken,
+        onComplete: (payload) => handlers.onComplete?.((payload.response ?? payload) as CeaserChatResponse),
+        onError: handlers.onError,
+      },
+    ),
 }

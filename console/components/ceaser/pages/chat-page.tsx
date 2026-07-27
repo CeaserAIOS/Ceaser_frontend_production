@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ChangeEvent, ReactNode } from "react"
-import { chatApi, type AgentContribution, type ChatMessage, type ConversationRecord, type MessageMetadata, type RankedMemory, type ResearchResult, type WorkflowResult } from "@/lib/api/chat"
+import { chatApi, type AgentContribution, type CeaserChatResponse, type ChatMessage, type ConversationRecord, type MessageMetadata, type RankedMemory, type ResearchResult, type WorkflowResult } from "@/lib/api/chat"
 import { documentsApi, type DocumentKind } from "@/lib/api/documents"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
@@ -407,7 +407,33 @@ export function ChatPage() {
     try {
       const conversationId = await ensureConversation()
       const fileIds = attachedFiles.map((file) => file.id)
-      const response = await chatApi.sendCeaserMessage(content, conversationId, fileIds)
+      let response: CeaserChatResponse | null = null
+      try {
+        let streamedContent = ""
+        let streamError: string | null = null
+        await chatApi.sendCeaserMessageStream(content, conversationId, fileIds, {
+          onToken: (text) => {
+            streamedContent += text
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === typingMessage.id
+                  ? { ...message, content: streamedContent, timestamp: formatTime(), isTyping: false }
+                  : message,
+              ),
+            )
+          },
+          onComplete: (streamedResponse) => {
+            response = streamedResponse
+          },
+          onError: (message) => {
+            streamError = message
+          },
+        })
+        if (streamError) throw new Error(streamError)
+      } catch {
+        response = await chatApi.sendCeaserMessage(content, conversationId, fileIds)
+      }
+      if (!response) throw new Error("We couldn't complete your request. Please try again.")
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",

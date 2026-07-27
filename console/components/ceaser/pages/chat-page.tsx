@@ -107,14 +107,12 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
   const metadata = metadataFromRecord(message)
   const selectedAgents = metadata.selected_agents ?? []
   const memoriesUsed = metadata.memories_used ?? []
-  const sourceCount = metadata.research?.sources.length ?? 0
   const highlights =
-    message.role === "assistant" && (selectedAgents.length || metadata.scope || memoriesUsed.length || sourceCount)
+    message.role === "assistant" && (selectedAgents.length || metadata.scope || memoriesUsed.length)
       ? [
           metadata.scope ? `Scope: ${metadata.scope}` : null,
           selectedAgents.length ? `Selected Agents: ${selectedAgents.join(", ")}` : null,
           `Memories Used: ${memoriesUsed.length}`,
-          `Sources: ${sourceCount}`,
         ].filter(Boolean) as string[]
       : undefined
 
@@ -859,7 +857,6 @@ function ChatBubble({ message }: { message: Message }) {
         ) : (
           <>
             <MarkdownMessage content={message.content} isUser={message.role === "user"} />
-            {message.role === "assistant" && <InlineSourceStrip message={message} />}
             {message.role === "assistant" && <ResponseActions message={message} />}
             <p className={cn("mt-2 text-xs", message.role === "user" ? "text-white/60" : "text-white/38")}>{message.timestamp}</p>
           </>
@@ -1311,25 +1308,7 @@ function renderInlineMarkdown(value: string) {
   })
 }
 
-function InlineSourceStrip({ message }: { message: Message }) {
-  if (!message.research?.sources.length) return null
-  return (
-    <div className="mt-5">
-      <p className="text-xs font-medium text-white/45">Sources ({message.research.sources.length})</p>
-      <div className="mt-2 space-y-1.5">
-        {message.research.sources.slice(0, 5).map((source, index) => (
-          <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="block text-xs text-white/62 transition hover:text-cyan-200">
-            <span className="text-white/38">[{index + 1}]</span> {source.title}
-            <span className="text-white/35"> - {source.source}</span>
-          </a>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function ResearchSidePanel({ message }: { message?: Message }) {
-  const sources = message?.research?.sources ?? []
   const memories = message?.memoriesUsed ?? []
   const contributions = message?.contributions ?? []
   const workflow = message?.workflow
@@ -1360,26 +1339,6 @@ function ResearchSidePanel({ message }: { message?: Message }) {
         ) : (
           <p className="text-sm text-muted-foreground">Workflow activity appears here after a workforce response.</p>
         )}
-      </section>
-
-      <section className="rounded-3xl border border-white/10 bg-[#111827]/72 p-4 shadow-[0_22px_65px_rgba(0,0,0,0.22)]">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Sources ({sources.length})</h2>
-          <span className="text-xs text-muted-foreground">View all</span>
-        </div>
-        <div className="space-y-3">
-          {sources.length ? sources.slice(0, 6).map((source, index) => (
-            <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="flex gap-2 rounded-xl p-1.5 transition hover:bg-white/5">
-              <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-primary/20 text-xs font-semibold text-primary">{index + 1}</span>
-              <span className="min-w-0">
-                <span className="block truncate text-[11px] text-muted-foreground">{source.source}</span>
-                <span className="line-clamp-2 text-xs font-medium">{source.title}</span>
-              </span>
-            </a>
-          )) : (
-            <p className="text-sm text-muted-foreground">Sources appear here after a research response.</p>
-          )}
-        </div>
       </section>
 
       <section className="rounded-3xl border border-white/10 bg-[#111827]/72 p-4 shadow-[0_22px_65px_rgba(0,0,0,0.18)]">

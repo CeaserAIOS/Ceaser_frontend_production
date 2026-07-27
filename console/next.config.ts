@@ -1,10 +1,12 @@
 import type { NextConfig } from "next";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const nextConfig: NextConfig = {
-  output: "export",
+  output: isProduction ? "export" : undefined,
   basePath: "/console",
   trailingSlash: true,
-  assetPrefix: "/console",
+  assetPrefix: isProduction ? "/console" : undefined,
   devIndicators: false,
   turbopack: {
     root: __dirname,

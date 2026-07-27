@@ -1,7 +1,8 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { user } from "@/lib/data"
+import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { GlowCard } from "../glow-card"
 import { CeaserLogo } from "../ceaser-logo"
 import { CeaserSelect } from "../ceaser-select"
@@ -107,7 +108,7 @@ export function SettingsPage() {
   const { theme, setTheme } = useApp()
   const [activeSection, setActiveSection] = useState("status")
   const [profile, setProfile] = useState<{ name?: string; email?: string; useCase?: string } | null>(null)
-  const [profileDraft, setProfileDraft] = useState({ name: user.name, email: "", useCase: user.role })
+  const [profileDraft, setProfileDraft] = useState({ name: getUserDisplayName(readUserProfile(), user.name), email: "", useCase: user.role })
   const [newPassword, setNewPassword] = useState("")
   const [securityMessage, setSecurityMessage] = useState("")
   const [securityBusy, setSecurityBusy] = useState<string | null>(null)
@@ -134,7 +135,7 @@ export function SettingsPage() {
       const savedProfile = JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null")
       setProfile(savedProfile)
       setProfileDraft({
-        name: savedProfile?.name || user.name,
+        name: getUserDisplayName(savedProfile, user.name),
         email: savedProfile?.email || "",
         useCase: savedProfile?.useCase || user.role,
       })
@@ -176,7 +177,7 @@ export function SettingsPage() {
     }
   }, [])
 
-  const displayName = profile?.name || user.name
+  const displayName = getUserDisplayName(profile, user.name)
   const displayEmail = profile?.email || "Signed in account"
   const displayRole = profile?.useCase || user.role
 
@@ -190,7 +191,7 @@ export function SettingsPage() {
 
   function saveProfile() {
     const next = {
-      name: profileDraft.name.trim() || user.name,
+      name: profileDraft.name.trim() || getUserDisplayName(profile, user.name),
       email: profileDraft.email.trim(),
       useCase: profileDraft.useCase,
     }
@@ -731,7 +732,7 @@ export function SettingsPage() {
                           style={{ width: `${Math.min(100, Math.round((item.used_quantity / Math.max(1, item.limit_value)) * 100))}%` }}
                         />
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">{item.remaining} remaining · resets {item.reset_period}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">{item.remaining} remaining Â· resets {item.reset_period}</p>
                     </div>
                   ))}
                 </div>
@@ -1047,3 +1048,5 @@ function getMfaSecret(enrollment: Record<string, unknown>) {
   const totp = enrollment.totp as Record<string, unknown> | undefined
   return String(totp?.secret || "")
 }
+
+

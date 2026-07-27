@@ -1,6 +1,6 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { authApi, type AuthSession } from "@/lib/api/auth"
 import { clearAuthTokens, getAccessToken } from "@/lib/api/client"
 import { CeaserSelect } from "./ceaser-select"
@@ -35,6 +35,8 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     graduationYear: "",
   })
   const [authBusy, setAuthBusy] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
+  const googleBusyRef = useRef(false)
   const [recoveryBusy, setRecoveryBusy] = useState(false)
   const [verificationBusy, setVerificationBusy] = useState(false)
   const [message, setMessage] = useState("")
@@ -216,6 +218,22 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     }
   }
 
+  async function handleGoogleSignIn() {
+    if (googleBusyRef.current) return
+    googleBusyRef.current = true
+    setGoogleBusy(true)
+    setMessage("")
+
+    try {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+      await Promise.resolve(authApi.signInWithGoogle())
+    } catch (error) {
+      googleBusyRef.current = false
+      setGoogleBusy(false)
+      setMessage(error instanceof Error ? cleanAuthMessage(error.message) : "Google sign-in is not configured.")
+    }
+  }
+
   function saveProfile() {
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
       name: name.trim() || firstName,
@@ -278,17 +296,20 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                   </PrimaryButton>
                   <button
                     type="button"
-                    onClick={() => {
-                      try {
-                        authApi.signInWithGoogle()
-                      } catch (error) {
-                        setMessage(error instanceof Error ? cleanAuthMessage(error.message) : "Google sign-in is not configured.")
-                      }
-                    }}
-                    className="group inline-flex h-12 items-center justify-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_50px_rgba(0,0,0,0.18)] transition hover:border-white/25 hover:bg-white/[0.12] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_22px_70px_rgba(59,130,246,0.16)]"
+                    disabled={googleBusy}
+                    onClick={() => void handleGoogleSignIn()}
+                    aria-busy={googleBusy}
+                    className="group inline-flex h-12 items-center justify-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_50px_rgba(0,0,0,0.18)] transition hover:border-white/25 hover:bg-white/[0.12] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_22px_70px_rgba(59,130,246,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] font-black text-[#4285f4] shadow-sm transition group-hover:scale-105">G</span>
-                    <span>Continue with Google</span>
+                    {googleBusy ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Redirecting...</span>
+                      </>
+                    ) : (
+                      <span>Continue with Google</span>
+                    )}
                   </button>
                   <button type="button" onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")} className="text-sm text-muted-foreground transition hover:text-primary">
                     {authMode === "login" ? "Need an account? Create one" : "Already have an account? Sign in"}
@@ -517,3 +538,4 @@ function cleanAuthMessage(value: string) {
 function sessionEmail(session?: AuthSession | null) {
   return session?.email || session?.user?.email || ""
 }
+

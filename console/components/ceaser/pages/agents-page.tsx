@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
@@ -93,7 +93,7 @@ export function AgentsPage() {
       const workbench = agentData[agent.id]
       const matchesFilter =
         filter === "all" ||
-        (filter === "active" && isAgentEnabled(agent.id)) ||
+        (filter === "active" && agent.status === "active" && isAgentEnabled(agent.id)) ||
         (filter === "recent" && Boolean(workbench?.activity.length || workbench?.drafts.length))
       return matchesFilter
     })
@@ -159,7 +159,7 @@ export function AgentsPage() {
         <aside className="overflow-y-auto bg-[#070c18]/90 p-6">
           <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
             <div className="flex items-start gap-4">
-              <AgentAvatar agent={selectedAgent} size="lg" showGlow />
+              <AgentAvatar agent={selectedAgent} size="lg" showStatus showGlow enabled={isAgentEnabled(selectedAgent.id)} />
               <div>
                 <h2 className="text-xl font-semibold">{selectedAgent.name}</h2>
                 <p className="text-sm text-slate-400">{selectedAgent.role.replace(" Agent", "")}</p>
@@ -253,7 +253,7 @@ function AgentCard({
             <p className="text-xs text-slate-400">{agent.role.replace(" Agent", "")}</p>
           </div>
         </div>
-        <span className={cn("h-2 w-2 rounded-full", !enabled ? "bg-slate-500" : "bg-emerald-400")} />
+        {enabled && agent.status === "active" && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
       </div>
       <p className="min-h-[72px] text-sm leading-6 text-slate-300">{descriptions[agent.id] ?? agent.description}</p>
       <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4 text-xs text-slate-400">
@@ -316,3 +316,5 @@ function ActivityLine({ activity }: { activity: DraftHistoryRecord }) {
     </div>
   )
 }
+
+

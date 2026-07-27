@@ -1,33 +1,33 @@
 "use client"
 
 import { agents, type Agent } from "@/lib/data"
+import { useAgentStore } from "@/lib/stores/agent-store"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 
 interface OrbitalVisualizationProps {
   className?: string
+  selectedAgentId?: string | null
   onAgentClick?: (agent: Agent) => void
 }
 
-export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisualizationProps) {
-  const activeAgents = agents.filter(a => a.status === "active")
-  
-  // Position agents in orbital positions around the center
+export function OrbitalVisualization({ className, selectedAgentId, onAgentClick }: OrbitalVisualizationProps) {
+  const { isAgentEnabled } = useAgentStore()
+  const activeAgents = agents.filter((agent) => isAgentEnabled(agent.id))
+
   const agentPositions = [
-    { angle: -60, radius: 140, agent: agents.find(a => a.id === "bolt") },
-    { angle: -120, radius: 140, agent: agents.find(a => a.id === "alex") },
-    { angle: 180, radius: 140, agent: agents.find(a => a.id === "friday") },
-    { angle: 120, radius: 160, agent: agents.find(a => a.id === "zeus") },
-    { angle: 60, radius: 140, agent: agents.find(a => a.id === "atlas") },
-    { angle: 0, radius: 160, agent: agents.find(a => a.id === "nova") },
+    { angle: -60, radius: 140, agent: agents.find((agent) => agent.id === "bolt") },
+    { angle: -120, radius: 140, agent: agents.find((agent) => agent.id === "alex") },
+    { angle: 180, radius: 140, agent: agents.find((agent) => agent.id === "friday") },
+    { angle: 120, radius: 160, agent: agents.find((agent) => agent.id === "zeus") },
+    { angle: 60, radius: 140, agent: agents.find((agent) => agent.id === "atlas") },
+    { angle: 0, radius: 160, agent: agents.find((agent) => agent.id === "nova") },
   ]
 
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
-      {/* Neural network background grid */}
       <div className="absolute inset-0 neural-grid opacity-30" />
-      
-      {/* Orbital rings */}
+
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 400">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -41,15 +41,14 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
             <stop offset="100%" stopColor="#7c5cff" stopOpacity="0.85" />
           </linearGradient>
           <filter id="glow">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
             <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
-        
-        {/* Outer ring */}
+
         <circle
           cx="200"
           cy="200"
@@ -59,10 +58,9 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
           strokeWidth="1.7"
           strokeDasharray="5 5"
           className="animate-[spin_36s_linear_infinite]"
-          style={{ transformOrigin: 'center' }}
+          style={{ transformOrigin: "center" }}
         />
-        
-        {/* Inner ring */}
+
         <circle
           cx="200"
           cy="200"
@@ -72,10 +70,9 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
           strokeWidth="1.35"
           strokeDasharray="3 7"
           className="animate-[spin_28s_linear_infinite_reverse]"
-          style={{ transformOrigin: 'center' }}
+          style={{ transformOrigin: "center" }}
         />
 
-        {/* Visible rotating sweep */}
         <circle
           cx="200"
           cy="200"
@@ -87,13 +84,12 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
           strokeDasharray="82 925"
           filter="url(#glow)"
           className="animate-[spin_12s_linear_infinite]"
-          style={{ transformOrigin: 'center' }}
+          style={{ transformOrigin: "center" }}
         />
-        
-        {/* Neural connection lines */}
-        {activeAgents.map((agent, i) => {
-          const pos = agentPositions.find(p => p.agent?.id === agent.id)
-          if (!pos) return null
+
+        {activeAgents.map((agent) => {
+          const pos = agentPositions.find((item) => item.agent?.id === agent.id)
+          if (!pos || selectedAgentId === agent.id) return null
           const x = 200 + pos.radius * Math.cos((pos.angle * Math.PI) / 180)
           const y = 200 + pos.radius * Math.sin((pos.angle * Math.PI) / 180)
           return (
@@ -113,8 +109,7 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
         })}
       </svg>
 
-      {/* Center CEASER logo */}
-      <motion.div 
+      <motion.div
         className="relative z-10 flex h-32 w-32 items-center justify-center"
         animate={{ scale: [1, 1.02, 1] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -126,43 +121,47 @@ export function OrbitalVisualization({ className, onAgentClick }: OrbitalVisuali
         </div>
       </motion.div>
 
-      {/* Agent nodes */}
       {agentPositions.map(({ angle, radius, agent }) => {
         if (!agent) return null
+        const Icon = agent.icon
         const x = radius * Math.cos((angle * Math.PI) / 180)
         const y = radius * Math.sin((angle * Math.PI) / 180)
-        const Icon = agent.icon
-        
+        const isSelected = selectedAgentId === agent.id
+        const showStatusDot = isAgentEnabled(agent.id)
+
         return (
-          <motion.div
+          <motion.button
             key={agent.id}
-            className="absolute z-20 cursor-pointer"
-            style={{
-              transform: `translate(${x}px, ${y}px)`,
-            }}
-            whileHover={{ scale: 1.1 }}
+            type="button"
+            className={cn("absolute z-20 cursor-pointer", isSelected && "z-30")}
+            initial={false}
+            animate={{ x, y: y - (isSelected ? 8 : 0), scale: isSelected ? 1.18 : 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 24 }}
+            whileHover={{ scale: isSelected ? 1.26 : 1.06 }}
             onClick={() => onAgentClick?.(agent)}
           >
-            <div className="flex flex-col items-center gap-1">
-              <div 
-                className="relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300"
-                style={{ 
+            <div className={cn("flex flex-col items-center gap-1", isSelected && "gap-2") }>
+              <div
+                className={cn(
+                  "relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300",
+                  isSelected && "h-14 w-14 rounded-2xl ring-2 ring-primary ring-offset-2 ring-offset-background",
+                )}
+                style={{
                   backgroundColor: `${agent.color}20`,
-                  boxShadow: agent.status === "active" 
-                    ? `0 0 20px ${agent.color}40, 0 0 40px ${agent.color}20` 
-                    : undefined
+                  boxShadow:
+                    isAgentEnabled(agent.id)
+                      ? `0 0 20px ${agent.color}40, 0 0 40px ${agent.color}20`
+                      : undefined,
                 }}
               >
                 <Icon className="h-6 w-6" style={{ color: agent.color }} />
-                {agent.status === "active" && (
-                  <div 
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500"
-                  />
+                {showStatusDot && (
+                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
                 )}
               </div>
-              <span className="text-xs font-medium text-foreground">{agent.name}</span>
+              <span className={cn("text-xs font-medium text-foreground transition-all duration-300", isSelected && "text-sm font-semibold")}>{agent.name}</span>
             </div>
-          </motion.div>
+          </motion.button>
         )
       })}
     </div>

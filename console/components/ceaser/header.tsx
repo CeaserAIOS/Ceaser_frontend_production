@@ -1,8 +1,9 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { useApp } from "@/lib/app-context"
-import { ceaserUser, getPageTitle } from "@/lib/ceaser"
+import { getPageTitle } from "@/lib/ceaser"
+import { getUserDisplayName, getUserDisplayRole, readUserProfile } from "@/lib/user-profile"
 import { authApi } from "@/lib/api/auth"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
@@ -20,7 +21,7 @@ const READ_NOTIFICATIONS_KEY = "ceaser_read_notifications"
 export function Header() {
   const { setIsSearchOpen, currentPage, setCurrentPage, confirmDialog } = useApp()
   const pageTitle = getPageTitle(currentPage)
-  const [profile, setProfile] = useState<{ name?: string; useCase?: string; email?: string } | null>(null)
+  const [profile, setProfile] = useState<{ name?: string; useCase?: string; email?: string } | null>(readUserProfile())
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [memories, setMemories] = useState<MemoryRecord[]>([])
@@ -29,7 +30,7 @@ export function Header() {
 
   useEffect(() => {
     try {
-      setProfile(JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null"))
+      setProfile(readUserProfile())
       setReadNotificationIds(JSON.parse(window.localStorage.getItem(READ_NOTIFICATIONS_KEY) || "[]"))
     } catch {
       setProfile(null)
@@ -51,7 +52,7 @@ export function Header() {
     void loadHeaderData()
     const refresh = () => {
       try {
-        setProfile(JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null"))
+        setProfile(readUserProfile())
       } catch {
         setProfile(null)
       }
@@ -70,8 +71,8 @@ export function Header() {
     }
   }, [])
 
-  const displayName = profile?.name || ceaserUser.name
-  const displayRole = profile?.useCase || ceaserUser.role
+  const displayName = getUserDisplayName(profile)
+  const displayRole = getUserDisplayRole(profile)
   const notificationItems = useMemo(() => {
     return [
       memories[0]
@@ -243,3 +244,5 @@ function getMemoryTitle(memory: MemoryRecord) {
   const metadata = (memory.metadata ?? memory.extra_metadata ?? {}) as { title?: string }
   return metadata.title || memory.content.split("\n")[0]?.replace(/^#+\s*/, "").slice(0, 80) || "Memory"
 }
+
+

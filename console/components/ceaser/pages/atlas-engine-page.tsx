@@ -1,11 +1,13 @@
-"use client"
+﻿"use client"
 
 import { ceaserEngines, ceaserIntegrations, getAgent } from "@/lib/ceaser"
+import { useAgentStore } from "@/lib/stores/agent-store"
 import { GlowCard } from "../glow-card"
 import { AgentAvatar } from "../agent-avatar"
 import { Code2, GitBranch, Rocket, Terminal } from "lucide-react"
 
 export function AtlasEnginePage() {
+  const { isAgentEnabled } = useAgentStore()
   const atlas = getAgent("atlas")
   const engine = ceaserEngines.find((item) => item.id === "atlas")
   const integrations = ceaserIntegrations.filter((item) => engine?.integrations?.includes(item.id))
@@ -20,7 +22,7 @@ export function AtlasEnginePage() {
           <h1 className="text-3xl font-bold">{engine.name}</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">{engine.purpose}</p>
         </div>
-        <AgentAvatar agent={atlas} size="xl" showStatus showGlow />
+        <AgentAvatar agent={atlas} size="xl" showStatus showGlow enabled={isAgentEnabled(atlas.id)} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -76,3 +78,7 @@ export function AtlasEnginePage() {
     </div>
   )
 }
+
+
+
+

@@ -1,8 +1,9 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useApp } from "@/lib/app-context"
-import { agents, user, type Agent } from "@/lib/data"
+import { agents, type Agent } from "@/lib/data"
+import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { useAgentStore } from "@/lib/stores/agent-store"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
@@ -10,7 +11,7 @@ import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
 import { AgentAvatar } from "../agent-avatar"
 import { GlowCard, StatCard } from "../glow-card"
 import { OrbitalVisualization } from "../orbital-visualization"
-import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
 import { 
   Play, 
   FolderKanban, 
@@ -34,15 +35,17 @@ function getMemoryDescription(memory: MemoryRecord) {
 }
 
 export function MissionControl() {
-  const { setSelectedAgentId, setCurrentPage, setIsVoiceModalOpen } = useApp()
+  const { selectedAgentId, setSelectedAgentId, setCurrentPage, setIsVoiceModalOpen } = useApp()
   const { isAgentEnabled } = useAgentStore()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [memories, setMemories] = useState<MemoryRecord[]>([])
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [isRailLoading, setIsRailLoading] = useState(true)
+  const [openingAgentId, setOpeningAgentId] = useState<string | null>(null)
+  const openAgentTimerRef = useRef<number | null>(null)
   
-  const activeAgents = agents.filter(a => isAgentEnabled(a.id))
-  const enabledAgentsCount = agents.filter(a => isAgentEnabled(a.id)).length
+  const activeAgents = agents.filter((agent) => agent.status === "active" && isAgentEnabled(agent.id))
+  const enabledAgentsCount = agents.filter((agent) => isAgentEnabled(agent.id)).length
   useEffect(() => {
     let mounted = true
     async function loadMissionData() {
@@ -65,9 +68,24 @@ export function MissionControl() {
   }, [])
 
   const handleAgentClick = (agent: Agent) => {
+    if (openAgentTimerRef.current) {
+      window.clearTimeout(openAgentTimerRef.current)
+    }
     setSelectedAgentId(agent.id)
-    setCurrentPage("agents")
+    setOpeningAgentId(agent.id)
+    openAgentTimerRef.current = window.setTimeout(() => {
+      setCurrentPage("agents")
+      setOpeningAgentId(null)
+    }, 180)
   }
+
+  useEffect(() => {
+    return () => {
+      if (openAgentTimerRef.current) {
+        window.clearTimeout(openAgentTimerRef.current)
+      }
+    }
+  }, [])
 
   const stats = {
     projects: projects.length,
@@ -83,7 +101,7 @@ export function MissionControl() {
       <div className="flex-1 overflow-y-auto p-6">
         {/* Header */}
         <div className="spatial-panel-elevated mb-7 rounded-3xl p-6">
-          <p className="text-sm text-muted-foreground">Mission Control / {user.name}</p>
+          <p className="text-sm text-muted-foreground">Mission Control / {getUserDisplayName(readUserProfile())}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">Your AI workforce is operational.</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Agents, memory, files, and workflows are arranged as one live operating layer.</p>
         </div>
@@ -157,7 +175,7 @@ export function MissionControl() {
                       onClick={() => handleAgentClick(agent)}
                     >
                       <div className="flex items-start gap-3">
-                        <AgentAvatar agent={agent} size="lg" showStatus showGlow />
+                        <AgentAvatar agent={agent} size="lg" showStatus showGlow enabled={isAgentEnabled(agent.id)} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-semibold">{agent.name}</p>
@@ -177,10 +195,34 @@ export function MissionControl() {
 
           {/* Right Column - Orbital Visualization */}
           <div className="relative min-h-[400px]">
-            <OrbitalVisualization 
-              className="h-full w-full" 
+            <OrbitalVisualization
+              className="h-full w-full"
+              selectedAgentId={selectedAgentId}
               onAgentClick={handleAgentClick}
             />
+            {openingAgentId && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ type: "spring", stiffness: 240, damping: 22 }}
+                className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center"
+              >
+                {(() => {
+                  const popupAgent = agents.find((agent) => agent.id === openingAgentId)
+                  if (!popupAgent) return null
+                  return (
+                    <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/15 bg-[#0b1224]/92 px-6 py-5 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+                      <AgentAvatar agent={popupAgent} size="lg" showStatus showGlow enabled={isAgentEnabled(popupAgent.id)} />
+                      <div className="text-center">
+                        <p className="text-sm font-semibold">{popupAgent.name}</p>
+                        <p className="text-xs text-muted-foreground">Opening agent screen...</p>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
@@ -316,3 +358,15 @@ export function MissionControl() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+

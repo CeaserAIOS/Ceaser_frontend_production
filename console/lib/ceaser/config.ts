@@ -23,7 +23,7 @@ import type {
 } from "./types"
 
 export const ceaserUser = {
-  name: "Akshay",
+  name: "CEASER User",
   role: "Founder",
   avatar: "/avatar.jpg",
 }
@@ -82,7 +82,7 @@ export const ceaserAgents: CeaserAgent[] = [
     role: "Personal Life Intelligence Agent",
     description: "Manages goals, learning, productivity, health, travel, and personal finance intelligence.",
     purpose: "Personal growth and life management.",
-    status: "idle",
+    status: "active",
     color: "#c084fc",
     colorClass: "text-[#c084fc]",
     bgColorClass: "bg-[#c084fc]",
@@ -174,7 +174,7 @@ export const ceaserAgents: CeaserAgent[] = [
     role: "Software Engineering Agent",
     description: "Builds software products through conversation from planning to architecture, coding, deployment, and GitHub management.",
     purpose: "Build software products through conversation.",
-    status: "idle",
+    status: "active",
     color: "#6366f1",
     colorClass: "text-[#6366f1]",
     bgColorClass: "bg-[#6366f1]",
@@ -270,3 +270,4 @@ export const navigationItems: NavigationItem[] = baseNavigationItems.filter((ite
 export const getAgent = (id: string) => ceaserAgents.find((agent) => agent.id === id)
 export const getEngine = (id: string) => ceaserEngines.find((engine) => engine.id === id)
 export const getPageTitle = (id: string) => navigationItems.find((item) => item.id === id)?.label ?? "Mission Control"
+

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Image from "next/image"
 import { useEffect, useRef } from "react"
@@ -6,6 +6,7 @@ import favicon from "@/public/favicon.png"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
 import lightWordmark from "@/public/ceaser-wordmark-light-transparent.png"
 import { useApp } from "@/lib/app-context"
+import { useAgentStore } from "@/lib/stores/agent-store"
 import { ceaserAgents, navigationItems } from "@/lib/ceaser"
 import { AgentAvatar } from "./agent-avatar"
 import { cn } from "@/lib/utils"
@@ -13,6 +14,7 @@ import { Plus } from "lucide-react"
 
 export function Sidebar() {
   const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed, theme } = useApp()
+  const { isAgentEnabled } = useAgentStore()
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const expandSidebar = () => {
@@ -102,7 +104,7 @@ export function Sidebar() {
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
                 >
-                  <AgentAvatar agent={agent} size="sm" showStatus />
+                  <AgentAvatar agent={agent} size="sm" showStatus enabled={isAgentEnabled(agent.id)} />
                   <div className="flex-1 text-left">
                     <p className="font-medium text-foreground">{agent.name}</p>
                     <p className="text-xs text-muted-foreground">{agent.role}</p>
@@ -121,3 +123,5 @@ export function Sidebar() {
     </aside>
   )
 }
+
+

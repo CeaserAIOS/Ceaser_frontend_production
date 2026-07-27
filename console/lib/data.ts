@@ -182,7 +182,7 @@ export const stats = {
   projects: 3,
   tasks: 18,
   goals: 12,
-  agentsActive: 5,
+  agentsActive: 6,
   agentsTotal: 6,
   tasksRunning: 14,
   tasksCompleted: 28

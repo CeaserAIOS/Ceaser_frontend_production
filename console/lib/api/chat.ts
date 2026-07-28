@@ -112,7 +112,7 @@ export const chatApi = {
     const params = new URLSearchParams()
     if (archived) params.set("archived", "true")
     const query = params.toString() ? `?${params.toString()}` : ""
-    return apiRequest<ConversationRecord[]>(`/conversations${query}`)
+    return apiRequest<ConversationRecord[]>(`/conversations${query}`, { cacheTtlMs: 300000 })
   },
   createConversation: (title?: string) =>
     apiRequest<ConversationRecord>("/conversations", {
@@ -129,7 +129,7 @@ export const chatApi = {
       method: "DELETE",
     }),
   listMessages: (conversationId: string, limit = 60) =>
-    apiRequest<ChatMessage[]>(`/chat/conversations/${conversationId}/messages?limit=${limit}`),
+    apiRequest<ChatMessage[]>(`/chat/conversations/${conversationId}/messages?limit=${limit}`, { cacheTtlMs: 300000 }),
   sendMessage: (conversationId: string, content: string, role: "user" | "assistant" | "system" = "user", metadata: Record<string, unknown> = {}) =>
     apiRequest<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
       method: "POST",

@@ -223,6 +223,8 @@ export function ChatPage() {
   const preferredConversationRef = useRef<string | null>(null)
   const conversationCacheRef = useRef(new Map<string, Message[]>())
   const conversationRequestCacheRef = useRef(new Map<string, Promise<Message[]>>())
+  const conversationsRequestRef = useRef<Promise<ConversationRecord[]> | null>(null)
+  const hasBootedRef = useRef(false)
   const loadRequestRef = useRef(0)
   const streamAbortRef = useRef<AbortController | null>(null)
   const streamSessionRef = useRef(0)
@@ -298,33 +300,40 @@ export function ChatPage() {
   }, [])
 
   const loadConversations = useCallback(async () => {
-    try {
-      const records = await chatApi.listConversations(showArchivedChats)
-      setConversations(records)
-      setLoadError(null)
-      for (const conversation of records.slice(0, 5)) {
-        if (conversationCacheRef.current.has(conversation.id) || conversationRequestCacheRef.current.has(conversation.id)) continue
-        const request = chatApi
-          .listMessages(conversation.id, 24)
-          .then((messages) => messages.map(normalizeMessage))
-          .then((normalized) => {
-            if (!conversationCacheRef.current.has(conversation.id)) {
-              conversationCacheRef.current.set(conversation.id, normalized)
-            }
-            return normalized
-          })
-          .catch(() => [])
-          .finally(() => {
-            conversationRequestCacheRef.current.delete(conversation.id)
-          })
-        conversationRequestCacheRef.current.set(conversation.id, request)
+    if (conversationsRequestRef.current) return conversationsRequestRef.current
+    const request = (async () => {
+      try {
+        const records = await chatApi.listConversations(showArchivedChats)
+        setConversations(records)
+        setLoadError(null)
+        for (const conversation of records.slice(0, 5)) {
+          if (conversationCacheRef.current.has(conversation.id) || conversationRequestCacheRef.current.has(conversation.id)) continue
+          const preload = chatApi
+            .listMessages(conversation.id, 24)
+            .then((messages) => messages.map(normalizeMessage))
+            .then((normalized) => {
+              if (!conversationCacheRef.current.has(conversation.id)) {
+                conversationCacheRef.current.set(conversation.id, normalized)
+              }
+              return normalized
+            })
+            .catch(() => [])
+            .finally(() => {
+              conversationRequestCacheRef.current.delete(conversation.id)
+            })
+          conversationRequestCacheRef.current.set(conversation.id, preload)
+        }
+        return records
+      } catch (error) {
+        setConversations([])
+        setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
+        return [] as ConversationRecord[]
+      } finally {
+        conversationsRequestRef.current = null
       }
-      return records
-    } catch (error) {
-      setConversations([])
-      setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
-      return [] as ConversationRecord[]
-    }
+    })()
+    conversationsRequestRef.current = request
+    return request
   }, [showArchivedChats])
 
   const refreshConversationList = useCallback(async () => {
@@ -340,25 +349,26 @@ export function ChatPage() {
   useEffect(() => {
     const boot = async () => {
       setIsBooting(true)
-      try {
-        preferredConversationRef.current = window.localStorage.getItem(ACTIVE_CONVERSATION_KEY)
-        const seed = window.localStorage.getItem("ceaser_chat_seed")
-        if (seed) {
-          setInput(seed)
-          window.localStorage.removeItem("ceaser_chat_seed")
-        }
-        setActiveConversationId(null)
-        setMessages([])
-        const records = await loadConversations()
-        const preferredId = preferredConversationRef.current
-        if (preferredId && records.some((conversation) => conversation.id === preferredId)) {
-          setActiveConversationId(preferredId)
-          void loadMessages(preferredId)
-        } else {
-          window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
-        }
-      } finally {
-        setIsBooting(false)
+      preferredConversationRef.current = window.localStorage.getItem(ACTIVE_CONVERSATION_KEY)
+      const seed = window.localStorage.getItem("ceaser_chat_seed")
+      if (seed) {
+        setInput(seed)
+        window.localStorage.removeItem("ceaser_chat_seed")
+      }
+      setActiveConversationId(null)
+      setMessages([])
+      setIsConversationLoading(false)
+      setIsBooting(false)
+      hasBootedRef.current = true
+
+      const records = await loadConversations()
+      const preferredId = preferredConversationRef.current
+      if (preferredId && records.some((conversation) => conversation.id === preferredId)) {
+        setActiveConversationId(preferredId)
+        void loadMessages(preferredId)
+      } else {
+        window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
+        setIsConversationLoading(false)
       }
     }
     void boot()
@@ -390,8 +400,10 @@ export function ChatPage() {
   }, [])
 
   useEffect(() => {
-    if (!showSavedResponses) void loadConversations()
+    if (!showSavedResponses && hasBootedRef.current) void loadConversations()
   }, [showArchivedChats, showSavedResponses, loadConversations])
+
+  const isActiveChatLoading = isConversationLoading && Boolean(activeConversationId)
 
   const queueFollowUp = useCallback((prompt: string) => {
     setInput(prompt)
@@ -914,13 +926,13 @@ export function ChatPage() {
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6">
-          <div className={cn("min-h-0 flex-1 overflow-y-auto pr-3", messages.length || isBooting ? "pt-10" : "pt-[17vh]")}>
+          <div className={cn("min-h-0 flex-1 overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[17vh]")}>
             {loadError && (
               <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                 {loadError}
               </div>
             )}
-            {!messages.length && !isBooting && !isConversationLoading ? (
+            {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
                 <h1 className="text-left text-[38px] font-light leading-[1.08] tracking-[-0.03em] text-white md:text-[44px]">
                   {`Hey! ${displayName}`}
@@ -952,7 +964,7 @@ export function ChatPage() {
               </>
             ) : (
               <div className="mx-auto w-full max-w-[1180px] space-y-7">
-                {isBooting || isConversationLoading ? (
+                {isBooting || isActiveChatLoading ? (
                   <div className="flex items-center justify-center gap-2 py-12 text-sm text-white/55">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {isBooting ? "Loading conversation..." : "Opening chat..."}

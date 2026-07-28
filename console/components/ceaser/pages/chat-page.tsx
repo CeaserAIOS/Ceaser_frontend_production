@@ -6,6 +6,7 @@ import { chatApi, type AgentContribution, type CeaserChatResponse, type ChatMess
 import { documentsApi, type DocumentKind } from "@/lib/api/documents"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
+import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
 import { CeaserLogo } from "../ceaser-logo"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
@@ -200,6 +201,7 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
 
 export function ChatPage() {
   const { setCurrentPage, confirmDialog, promptDialog, theme } = useApp()
+  const [displayName, setDisplayName] = useState("there")
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -241,6 +243,17 @@ export function ChatPage() {
     if (!query) return savedResponses
     return savedResponses.filter((item) => `${item.title} ${item.content}`.toLowerCase().includes(query))
   }, [savedResponses, searchQuery])
+
+  useEffect(() => {
+    const syncProfile = () => {
+      const profile = readUserProfile()
+      const fullName = getUserDisplayName(profile, "there")
+      setDisplayName(fullName.split(" ")[0] || "there")
+    }
+    syncProfile()
+    window.addEventListener("storage", syncProfile)
+    return () => window.removeEventListener("storage", syncProfile)
+  }, [])
 
   const cancelActiveStream = useCallback(() => {
     streamSessionRef.current += 1
@@ -910,7 +923,7 @@ export function ChatPage() {
             {!messages.length && !isBooting && !isConversationLoading ? (
               <>
                 <h1 className="text-left text-[38px] font-light leading-[1.08] tracking-[-0.03em] text-white md:text-[44px]">
-                  Hey! Akshay
+                  {`Hey! ${displayName}`}
                   <br />
                   <span className="text-white/82">What can I help with?</span>
                 </h1>

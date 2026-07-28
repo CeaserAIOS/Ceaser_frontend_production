@@ -41,7 +41,8 @@ import {
   Landmark,
   CreditCard,
   GraduationCap,
-  Upload
+  Upload,
+  Loader2
 } from "lucide-react"
 
 declare global {
@@ -161,6 +162,7 @@ export function SettingsPage() {
   const [pendingVerificationId, setPendingVerificationId] = useState("")
   const [studentModalOpen, setStudentModalOpen] = useState(false)
   const [studentCheckoutPlan, setStudentCheckoutPlan] = useState<CommercialPlan | null>(null)
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false)
   const commercialLoadedRef = useRef(false)
   const commercialPrefetchRef = useRef(false)
   const plansSectionRef = useRef<HTMLDivElement | null>(null)
@@ -522,6 +524,7 @@ export function SettingsPage() {
   async function runTestUpgrade(planCode: string, interval: "monthly" | "annual") {
     setCommercialBusy(`${planCode}-${interval}`)
     setCommercialMessage("Opening secure checkout...")
+    setCheckoutModalOpen(true)
     try {
       const [, checkoutConfig] = await Promise.all([
         ensureRazorpayLoaded(),
@@ -575,12 +578,15 @@ export function SettingsPage() {
         checkout.on("payment.failed", () => {
           reject(new Error("Payment failed. Please try again."))
         })
+        setCheckoutModalOpen(false)
         checkout.open()
       })
       await loadCommercialData()
     } catch (error) {
+      setCheckoutModalOpen(false)
       setCommercialMessage(error instanceof Error ? error.message : "Could not start checkout.")
     } finally {
+      setCheckoutModalOpen(false)
       setCommercialBusy(null)
     }
   }
@@ -1319,6 +1325,30 @@ export function SettingsPage() {
                         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-muted-foreground">
                           Current status: <span className="font-semibold text-foreground">{studentVerification?.status ? humanizeEntitlement(studentVerification.status) : "Not started"}</span>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {checkoutModalOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-md rounded-[2rem] border border-primary/20 bg-card p-6 shadow-2xl">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                        <CreditCard className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-xl font-bold">Opening secure checkout</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          We&apos;re preparing Razorpay for your CEASER upgrade. This usually takes a moment.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-background/50 px-4 py-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <div className="text-sm text-muted-foreground">
+                        Connecting to the payment gateway securely...
                       </div>
                     </div>
                   </div>

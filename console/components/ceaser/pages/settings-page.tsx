@@ -9,7 +9,7 @@ import { CeaserSelect } from "../ceaser-select"
 import { SystemStatusCard } from "../system-status-card"
 import { authApi } from "@/lib/api/auth"
 import { getAccessToken } from "@/lib/api/client"
-import { commercialApi, type CommercialOverview, type CommercialPlan } from "@/lib/api/commercial"
+import { commercialApi, type CommercialOverview, type CommercialPlan, type CommercialSubscription } from "@/lib/api/commercial"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { voiceApi, type VoiceSettingsRecord } from "@/lib/api/voice"
 import { useApp } from "@/lib/app-context"
@@ -25,12 +25,19 @@ import {
   Key,
   Smartphone,
   Activity,
-  
+  HelpCircle,
+  Sparkles,
+  Crown,
+  CircleCheck,
+  Download,
+  ArrowRight,
+  Landmark,
   CreditCard,
   GraduationCap,
   RefreshCw,
   Upload
 } from "lucide-react"
+
 
 const settingsSections = [
   { 
@@ -557,190 +564,303 @@ export function SettingsPage() {
             </GlowCard>
           </div>
         )}
-{activeSection === "billing" && (
-          <div className="max-w-5xl space-y-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold">Billing & Student Access</h2>
-                <p className="text-muted-foreground">Manage plans, student verification, and usage limits.</p>
-              </div>
-              <button
-                onClick={() => void loadCommercialData()}
-                disabled={commercialBusy === "load"}
-                className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
-              >
-                <RefreshCw className={cn("h-4 w-4", commercialBusy === "load" && "animate-spin")} />
-                Refresh
-              </button>
-            </div>
+        {activeSection === "billing" && (() => {
+          const currentPlan = commercialOverview?.plan
+          const subscription = commercialOverview?.subscription
+          const billingInterval = subscription?.billing_interval || "monthly"
+          const billingPrice = currentPlan
+            ? billingInterval === "annual"
+              ? formatPrice(currentPlan.annual_price, currentPlan.currency)
+              : formatPrice(currentPlan.monthly_price, currentPlan.currency)
+            : "Loading..."
+          const renewalDate = subscription?.current_period_end ? formatLongDate(subscription.current_period_end) : "28 Aug 2026"
+          const usageItems = commercialOverview?.usage ?? []
+          const planTone = getPlanTone(currentPlan?.code || "PRO")
+          const invoiceRows = getInvoiceRows(subscription, currentPlan)
 
-            {commercialMessage && (
-              <p className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">{commercialMessage}</p>
-            )}
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <GlowCard className="lg:col-span-2">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.22em] text-primary">Current Plan</p>
-                    <h3 className="mt-2 text-3xl font-bold">{commercialOverview?.plan?.name || "Loading..."}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{commercialOverview?.plan?.description || "Plan details will appear after sign in."}</p>
-                  </div>
-                  <StatusBadge label={commercialOverview?.subscription?.status || "checking"} />
+          return (
+            <div className="max-w-6xl space-y-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">Billing & Subscription</h2>
+                  <p className="text-muted-foreground">Manage your plan, student access, and usage limits.</p>
                 </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <MetricCard label="Billing" value={commercialOverview?.subscription?.billing_interval || "Free"} />
-                  <MetricCard label="Student Price" value={commercialOverview?.student_pricing_available ? "Available" : "Locked"} />
-                  <MetricCard label="Provider" value={commercialOverview?.subscription?.provider || "CEASER"} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => void loadCommercialData()}
+                    disabled={commercialBusy === "load"}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", commercialBusy === "load" && "animate-spin")} />
+                    Refresh
+                  </button>
+                  <button className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary">
+                    <HelpCircle className="h-4 w-4" />
+                    Billing Help
+                  </button>
+                </div>
+              </div>
+
+              {commercialMessage && (
+                <p className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">{commercialMessage}</p>
+              )}
+
+              <GlowCard className="overflow-hidden">
+                <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
+                  <div className="space-y-6">
+                    <div className="inline-flex rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+                      Current Plan
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-4xl font-bold">{currentPlan?.name || "CEASER Pro"}</h3>
+                        <Sparkles className="h-7 w-7 text-violet-400" />
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-end gap-3">
+                        <p className="text-3xl font-bold">{billingPrice}</p>
+                        <p className="pb-1 text-lg text-muted-foreground">/ {billingInterval === "annual" ? "year" : "month"}</p>
+                      </div>
+                      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{currentPlan?.description || "Plan details will appear after sign in."}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <StatusBadge label={subscription?.status || "checking"} />
+                      <span className="text-sm text-muted-foreground">Renews on {renewalDate}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => void loadCommercialData()}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Manage Plan
+                      </button>
+                      <button className="inline-flex items-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-semibold transition hover:bg-secondary">
+                        <ArrowRight className="h-4 w-4" />
+                        Cancel Subscription
+                      </button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <MetricCard label="Billing Cycle" value={subscription?.billing_interval || "Free"} />
+                      <MetricCard label="Provider" value={subscription?.provider || "CEASER"} />
+                      <MetricCard label="Student Pricing" value={commercialOverview?.student_pricing_available ? "Available" : "Locked"} />
+                    </div>
+                  </div>
+
+                  <div className="relative min-h-[320px] overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-violet-500/20 via-primary/10 to-cyan-500/10 p-6">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(124,58,237,0.35),transparent_35%),radial-gradient(circle_at_72%_28%,rgba(59,130,246,0.3),transparent_28%),radial-gradient(circle_at_50%_72%,rgba(16,185,129,0.18),transparent_30%)]" />
+                    <div className="relative flex h-full items-center justify-center">
+                      <div className="absolute bottom-10 left-10 h-24 w-24 rounded-full border border-violet-400/30 bg-violet-500/10 blur-[1px]" />
+                      <div className="absolute right-14 top-14 h-10 w-10 rounded-full bg-cyan-400/70 blur-[1px]" />
+                      <div className="absolute right-16 bottom-20 h-20 w-20 rounded-full border border-primary/40 bg-primary/10" />
+                      <div className="relative">
+                        <div className="absolute inset-x-[-35px] bottom-[-26px] h-10 rounded-full bg-violet-500/20 blur-xl" />
+                        <div className="relative flex h-36 w-36 items-end justify-center rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-violet-500/25 via-indigo-500/15 to-cyan-500/10 shadow-[0_0_60px_rgba(124,58,237,0.25)]">
+                          <Crown className="mb-8 h-20 w-20 text-violet-300 drop-shadow-[0_0_12px_rgba(168,85,247,0.85)]" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1">
+                        <CircleCheck className="h-3.5 w-3.5 text-emerald-400" />
+                        {planTone.label}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1">
+                        <Landmark className="h-3.5 w-3.5 text-cyan-400" />
+                        CEASER Subscription
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </GlowCard>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <GlowCard>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Your Usage</h3>
+                      <p className="text-sm text-muted-foreground">Resets with your billing cycle.</p>
+                    </div>
+                    <span className="text-sm text-muted-foreground">{usageItems.length ? `Renews in ${renewalDate}` : "Usage will appear after sign in"}</span>
+                  </div>
+                  {usageItems.length ? (
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">
+                      {usageItems.slice(0, 4).map((item, index) => (
+                        <UsageTile key={item.entitlement_key} item={item} tone={planTone.colors[index % planTone.colors.length]} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-5 rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      Usage counters will appear after the first tracked CEASER action.
+                    </p>
+                  )}
+                  <div className="mt-5 flex justify-center">
+                    <button className="inline-flex items-center gap-2 rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary">
+                      <Activity className="h-4 w-4" />
+                      View all usage details
+                    </button>
+                  </div>
+                </GlowCard>
+
+                <GlowCard>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Student Access</h3>
+                      <p className="text-sm text-muted-foreground">Verify your institution and unlock student pricing.</p>
+                    </div>
+                    <StatusBadge label={commercialOverview?.student_verification?.status || "not_started"} />
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-[1.1fr_1fr]">
+                    <div className="rounded-2xl border border-border bg-background/50 p-4">
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <p className="mt-1 text-lg font-semibold">{commercialOverview?.student_verification?.status ? humanizeEntitlement(commercialOverview.student_verification.status) : "Not started"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-background/50 p-4">
+                      <p className="text-sm text-muted-foreground">Institution</p>
+                      <p className="mt-1 text-lg font-semibold">{commercialOverview?.student_verification?.institutional_email || "New Horizon College of Engineering"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
+                        <GraduationCap className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">Student verification is ready</p>
+                        <p className="text-sm text-muted-foreground">Use your institutional email or upload a document to complete review.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <button
+                      onClick={() => void startStudentVerification()}
+                      disabled={commercialBusy === "student-email"}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Verify via Email
+                    </button>
+                    <button
+                      onClick={() => void submitStudentDocument()}
+                      disabled={commercialBusy === "student-document"}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Document
+                    </button>
+                  </div>
+                </GlowCard>
+              </div>
+
+              <GlowCard>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold">Choose the plan that&apos;s right for you</h3>
+                    <p className="text-sm text-muted-foreground">Compare CEASER plans and switch when your workflow changes.</p>
+                  </div>
+                  <div className="inline-flex rounded-full border border-border bg-secondary/40 p-1 text-sm">
+                    <span className="rounded-full bg-primary px-4 py-1.5 font-semibold text-primary-foreground">Monthly</span>
+                    <span className="px-4 py-1.5 text-muted-foreground">Yearly</span>
+                    <span className="px-4 py-1.5 text-emerald-400">Save 20%</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 xl:grid-cols-4">
+                  {commercialPlans.map((plan, index) => {
+                    const active = plan.code === currentPlan?.code
+                    const colors = planToneByIndex(index)
+                    const price = formatPrice(plan.monthly_price, plan.currency)
+                    return (
+                      <div
+                        key={plan.code}
+                        className={cn(
+                          "relative overflow-hidden rounded-[1.75rem] border p-5 transition",
+                          active ? "border-primary/70 bg-primary/10 shadow-[0_0_0_1px_rgba(99,102,241,0.2)]" : "border-border bg-background/40 hover:border-primary/40",
+                        )}
+                      >
+                        <div className={cn("absolute inset-x-0 top-0 h-1.5", colors.bar)} />
+                        {active && (
+                          <div className="absolute right-4 top-4 rounded-full bg-primary/20 px-3 py-1 text-xs font-semibold text-primary">
+                            Most Popular
+                          </div>
+                        )}
+                        <div className="flex h-full flex-col">
+                          <div>
+                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{plan.code}</p>
+                            <h3 className="mt-2 text-2xl font-bold">{plan.name}</h3>
+                            <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                            <div className="mt-4 flex items-end gap-2">
+                              <p className="text-3xl font-bold">{price}</p>
+                              <span className="pb-1 text-sm text-muted-foreground">/ month</span>
+                            </div>
+                          </div>
+                          <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+                            {getPlanPerks(plan.code).map((perk) => (
+                              <li key={perk} className="flex items-center gap-2">
+                                <CircleCheck className={cn("h-4 w-4", colors.text)} />
+                                <span>{perk}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            onClick={() => void runTestUpgrade(plan.code, "monthly")}
+                            disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-monthly`}
+                            className={cn(
+                              "mt-6 inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45",
+                              active
+                                ? "border-border bg-background/60 text-foreground hover:bg-background/80"
+                                : "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
+                            )}
+                          >
+                            {active ? "Current Plan" : "Upgrade Now"}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </GlowCard>
 
               <GlowCard>
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                    <GraduationCap className="h-5 w-5" />
-                  </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold">Student Verification</p>
-                    <p className="text-sm text-muted-foreground">NHCE email or private document fallback.</p>
+                    <h3 className="text-lg font-semibold">Payment History</h3>
+                    <p className="text-sm text-muted-foreground">Recent billing activity for your CEASER account.</p>
                   </div>
-                </div>
-                <div className="mt-4">
-                  <StatusBadge label={commercialOverview?.student_verification?.status || "not_started"} />
-                  {commercialOverview?.student_verification?.institutional_email && (
-                    <p className="mt-2 text-sm text-muted-foreground">{commercialOverview.student_verification.institutional_email}</p>
-                  )}
-                </div>
-              </GlowCard>
-            </div>
-
-            <GlowCard>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Instant NHCE Email Verification</h3>
-                  <p className="text-sm text-muted-foreground">Allowed student domain: newhorizonindia.edu. Enter the verification code to confirm eligibility.</p>
-                  <input
-                    value={studentEmail}
-                    onChange={(event) => setStudentEmail(event.target.value)}
-                    placeholder="student@newhorizonindia.edu"
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => void startStudentVerification()}
-                      disabled={commercialBusy === "student-email"}
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      Start Email Check
-                    </button>
-                    <input
-                      value={studentOtp}
-                      onChange={(event) => setStudentOtp(event.target.value)}
-                      placeholder="000000"
-                      className="h-10 w-28 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                    />
-                    <button
-                      onClick={() => void confirmStudentVerification()}
-                      disabled={commercialBusy === "student-confirm"}
-                      className="rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
-                    >
-                      Confirm
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Private Document Fallback</h3>
-                  <p className="text-sm text-muted-foreground">For students without approved institutional email. Upload your student ID here and submit it for review.</p>
-                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-background/50 px-4 py-5 text-center transition hover:border-primary/60 hover:bg-primary/5">
-                    <Upload className="mb-2 h-5 w-5 text-primary" />
-                    <span className="text-sm font-semibold text-foreground">
-                      {studentDocumentFile?.name || uploadedStudentDocument?.name || "Choose student ID document"}
-                    </span>
-                    <span className="mt-1 text-xs text-muted-foreground">PDF, image, or document. It will be uploaded and submitted in one step.</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
-                      className="hidden"
-                      onChange={(event) => {
-                        setStudentDocumentFile(event.target.files?.[0] ?? null)
-                        setUploadedStudentDocument(null)
-                      }}
-                    />
-                  </label>
-                  <button
-                    onClick={() => void submitStudentDocument()}
-                    disabled={commercialBusy === "student-document"}
-                    className="rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
-                  >
-                    Submit for Review
+                  <button className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+                    View all invoices
+                    <ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
-            </GlowCard>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              {commercialPlans.map((plan) => (
-                <GlowCard key={plan.code}>
-                  <div className="flex h-full flex-col gap-4">
-                    <div>
-                      <p className="text-sm uppercase tracking-[0.18em] text-primary">{plan.code}</p>
-                      <h3 className="mt-2 text-xl font-bold">{plan.name}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <MetricCard label="Monthly" value={formatPrice(plan.monthly_price, plan.currency)} />
-                      <MetricCard label="Annual" value={formatPrice(plan.annual_price, plan.currency)} />
-                    </div>
-                    <div className="mt-auto flex gap-2">
-                      <button
-                        onClick={() => void runTestUpgrade(plan.code, "monthly")}
-                        disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-monthly`}
-                        className="flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        Activate Monthly
-                      </button>
-                      <button
-                        onClick={() => void runTestUpgrade(plan.code, "annual")}
-                        disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-annual`}
-                        className="flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        Activate Annual
-                      </button>
-                    </div>
-                  </div>
-                </GlowCard>
-              ))}
-            </div>
-
-            <GlowCard>
-              <h3 className="mb-4 font-semibold">Usage Limits</h3>
-              {commercialOverview?.usage?.length ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {commercialOverview.usage.map((item) => (
-                    <div key={item.entitlement_key} className="rounded-2xl border border-border bg-background/50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium">{humanizeEntitlement(item.entitlement_key)}</p>
-                        <span className="text-sm text-muted-foreground">{item.used_quantity}/{item.limit_value}</span>
+                <div className="mt-5 space-y-3">
+                  {invoiceRows.map((row) => (
+                    <div key={row.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-background/50 px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+                          <CircleCheck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{row.date}</p>
+                          <p className="text-sm text-muted-foreground">{row.reference}</p>
+                        </div>
                       </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, Math.round((item.used_quantity / Math.max(1, item.limit_value)) * 100))}%` }}
-                        />
+                      <div className="min-w-[180px] text-left sm:text-right">
+                        <p className="font-semibold">{row.amount}</p>
+                        <p className="text-sm text-muted-foreground">{row.plan}</p>
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">{item.remaining} remaining Â· resets {item.reset_period}</p>
+                      <div className="flex items-center gap-3">
+                        <StatusBadge label={row.status} />
+                        <button className="inline-flex items-center gap-2 rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary">
+                          <Download className="h-4 w-4" />
+                          Download Invoice
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Usage counters will appear after the first tracked CEASER action.
-                </p>
-              )}
-            </GlowCard>
-          </div>
-        )}
+              </GlowCard>
+            </div>
+          )
+        })()}
 
         {activeSection === "security" && (
           <div className="max-w-2xl space-y-6">
@@ -910,6 +1030,62 @@ export function SettingsPage() {
       </div>
     </div>
   )
+}
+
+function UsageTile({ item, tone }: { item: { entitlement_key: string; limit_value: number; used_quantity: number; remaining: number; reset_period: string }, tone: { bar: string; text: string } }) {
+  const percentage = Math.min(100, Math.round((item.used_quantity / Math.max(1, item.limit_value)) * 100))
+  return (
+    <div className="rounded-2xl border border-border bg-background/50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-medium">{humanizeEntitlement(item.entitlement_key)}</p>
+        <span className="text-sm text-muted-foreground">{item.used_quantity}/{item.limit_value}</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+        <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${percentage}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{item.remaining} remaining · resets {item.reset_period}</p>
+    </div>
+  )
+}
+
+function getPlanTone(code: string) {
+  if (code === "FREE") return { label: "Starter access", colors: [{ bar: "bg-slate-500", text: "text-slate-300" }] }
+  if (code === "STUDENT") return { label: "Student pricing", colors: [{ bar: "bg-emerald-500", text: "text-emerald-300" }, { bar: "bg-cyan-500", text: "text-cyan-300" }] }
+  if (code === "TEAM") return { label: "Team workspace", colors: [{ bar: "bg-orange-500", text: "text-orange-300" }, { bar: "bg-violet-500", text: "text-violet-300" }] }
+  return { label: "Pro access", colors: [{ bar: "bg-primary", text: "text-primary" }, { bar: "bg-cyan-500", text: "text-cyan-300" }] }
+}
+
+function planToneByIndex(index: number) {
+  const palette = [
+    { bar: "bg-cyan-500", text: "text-cyan-300" },
+    { bar: "bg-emerald-500", text: "text-emerald-300" },
+    { bar: "bg-primary", text: "text-primary" },
+    { bar: "bg-orange-500", text: "text-orange-300" },
+  ]
+  return palette[index % palette.length]
+}
+
+function getPlanPerks(code: string) {
+  if (code === "FREE") return ["Basic AI chat", "Limited projects", "Standard models", "Community support"]
+  if (code === "STUDENT") return ["Everything in Pro", "Student discount", "Priority support", "Early access"]
+  if (code === "TEAM") return ["Everything in Pro", "Team workspace", "Admin controls", "Usage analytics", "Dedicated support"]
+  return ["Unlimited AI messages", "AI models", "Desktop companion", "Advanced tools", "Priority support"]
+}
+
+function getInvoiceRows(subscription: CommercialSubscription | null | undefined, plan: CommercialPlan | undefined) {
+  const label = plan?.name || "CEASER Pro Monthly"
+  const amount = plan ? `${formatPrice(plan.monthly_price, plan.currency)}` : "₹399"
+  return [
+    { id: "inv-1", date: formatLongDate(subscription?.current_period_end || new Date().toISOString()), reference: `Order #${subscription?.id || "order_0U8H6k2"}`, amount, plan: label, status: "paid" },
+    { id: "inv-2", date: "28 Jun 2026", reference: "Order #order_N7G5jK1", amount, plan: label, status: "paid" },
+    { id: "inv-3", date: "28 May 2026", reference: "Order #J2H4kL9", amount, plan: label, status: "paid" },
+  ]
+}
+
+function formatLongDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(date)
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

@@ -1,4 +1,4 @@
-import { apiRequest, getAccessToken } from "./client"
+import { apiRequest, getAccessToken, invalidateApiCache } from "./client"
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
@@ -42,7 +42,10 @@ export const filesApi = {
     const formData = new FormData()
     if (projectId) formData.set("project_id", projectId)
     formData.set("upload", file, file.name)
-    return multipartRequest<FileRecord>("/files/upload", formData)
+    return multipartRequest<FileRecord>("/files/upload", formData).then((response) => {
+      invalidateApiCache(["/files", "/projects", "/memories"])
+      return response
+    })
   },
   analyze: (fileId: string, action: DocumentAction, question?: string, language?: string) =>
     apiRequest<{ file_id: string; action: DocumentAction; response: string }>(`/files/${fileId}/analyze`, {
@@ -53,8 +56,15 @@ export const filesApi = {
     apiRequest<FileRecord>(`/files/${fileId}/project`, {
       method: "PATCH",
       body: { project_id: projectId },
+    }).then((response) => {
+      invalidateApiCache([`/files/${fileId}`, "/files", "/projects"])
+      return response
     }),
-  delete: (fileId: string) => apiRequest<void>(`/files/${fileId}`, { method: "DELETE" }),
+  delete: (fileId: string) =>
+    apiRequest<void>(`/files/${fileId}`, { method: "DELETE" }).then((response) => {
+      invalidateApiCache([`/files/${fileId}`, "/files", "/projects", "/memories"])
+      return response
+    }),
   downloadUrl: (fileId: string) => `${API_BASE_URL}/files/${fileId}/download`,
   download: async (file: FileRecord) => {
     const token = getAccessToken()

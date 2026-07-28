@@ -40,6 +40,27 @@ export function clearAuthTokens() {
   window.localStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 
+export function invalidateApiCache(pathPrefixes: string[] = []) {
+  if (typeof window === "undefined") return
+  try {
+    const keysToRemove: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (!key || !key.startsWith(CACHE_PREFIX)) continue
+      if (!pathPrefixes.length) {
+        keysToRemove.push(key)
+        continue
+      }
+      if (pathPrefixes.some((prefix) => key.includes(`:${prefix}`))) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach((key) => window.localStorage.removeItem(key))
+  } catch {
+    // Cache invalidation is best-effort only.
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -48,6 +69,18 @@ export class ApiError extends Error {
     super(message)
     this.name = "ApiError"
   }
+}
+
+function isSessionAuthError(message: string, path: string) {
+  if (path.startsWith("/auth/")) return true
+  const normalized = message.trim().toLowerCase()
+  return [
+    "missing bearer token",
+    "invalid session",
+    "invalid supabase user",
+    "sign in required",
+    "session expired",
+  ].includes(normalized)
 }
 
 async function refreshAccessToken() {
@@ -103,6 +136,8 @@ async function request<T>(path: string, options: RequestOptions, accessToken: st
 function timeoutFor(path: string) {
   if (path.startsWith("/auth/")) return 20000
   if (
+    path.startsWith("/commercial") ||
+    path.startsWith("/billing") ||
     path.startsWith("/ceaser/chat") ||
     path.startsWith("/chat/") ||
     path.startsWith("/conversations") ||
@@ -110,7 +145,7 @@ function timeoutFor(path: string) {
     path.startsWith("/documents") ||
     path.startsWith("/knowledge/orchestrate")
   ) {
-    return 180000
+    return path.startsWith("/commercial") || path.startsWith("/billing") ? 30000 : 180000
   }
   return 12000
 }
@@ -152,7 +187,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch {
       // Keep default message when the API does not return JSON.
     }
-    if (response.status === 401) {
+    if (response.status === 401 && isSessionAuthError(message, path)) {
       clearAuthTokens()
       if (typeof window !== "undefined" && !path.startsWith("/auth/")) {
         window.dispatchEvent(new CustomEvent("ceaser:session-expired"))

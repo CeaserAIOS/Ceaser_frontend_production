@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { user } from "@/lib/data"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { GlowCard } from "../glow-card"
@@ -9,7 +9,15 @@ import { CeaserSelect } from "../ceaser-select"
 import { SystemStatusCard } from "../system-status-card"
 import { authApi } from "@/lib/api/auth"
 import { getAccessToken } from "@/lib/api/client"
-import { commercialApi, type CommercialOverview, type CommercialPlan, type CommercialSubscription } from "@/lib/api/commercial"
+import {
+  commercialApi,
+  type BillingCreateSubscriptionResponse,
+  type BillingInvoice,
+  type BillingSubscriptionOverview,
+  type CommercialPlan,
+  type CommercialSubscription,
+  type StudentVerification,
+} from "@/lib/api/commercial"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { voiceApi, type VoiceSettingsRecord } from "@/lib/api/voice"
 import { useApp } from "@/lib/app-context"
@@ -25,7 +33,6 @@ import {
   Key,
   Smartphone,
   Activity,
-  HelpCircle,
   Sparkles,
   Crown,
   CircleCheck,
@@ -34,9 +41,17 @@ import {
   Landmark,
   CreditCard,
   GraduationCap,
-  RefreshCw,
   Upload
 } from "lucide-react"
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void
+      on: (event: string, callback: (response: unknown) => void) => void
+    }
+  }
+}
 
 
 const settingsSections = [
@@ -89,6 +104,7 @@ const settingsSections = [
 
 const PROFILE_KEY = "ceaser_user_profile"
 const PREFERENCES_KEY = "ceaser_preferences"
+const COMMERCIAL_CACHE_KEY = "ceaser_commercial_cache_v1"
 const roleOptions = [
   { value: "Student", label: "Student", description: "Study plans, notes, exam prep" },
   { value: "Founder", label: "Founder", description: "Startups, strategy, fundraising" },
@@ -97,6 +113,24 @@ const roleOptions = [
   { value: "Developer", label: "Developer", description: "Technical planning and documentation" },
   { value: "Personal", label: "Personal", description: "Personal memory and daily assistance" },
 ]
+
+let razorpayLoader: Promise<void> | null = null
+const RAZORPAY_PUBLIC_KEY = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || ""
+
+function ensureRazorpayLoaded() {
+  if (typeof window === "undefined") return Promise.resolve()
+  if (window.Razorpay) return Promise.resolve()
+  if (razorpayLoader) return razorpayLoader
+  razorpayLoader = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script")
+    script.src = "https://checkout.razorpay.com/v1/checkout.js"
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error("Razorpay checkout could not be loaded."))
+    document.body.appendChild(script)
+  })
+  return razorpayLoader
+}
 
 export function SettingsPage() {
   const { theme, setTheme } = useApp()
@@ -114,16 +148,23 @@ export function SettingsPage() {
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([])
   const [sessionActive, setSessionActive] = useState(false)
   const [preferences, setPreferences] = useState({ notifications: true })
-  const [commercialOverview, setCommercialOverview] = useState<CommercialOverview | null>(null)
+  const [billingOverview, setBillingOverview] = useState<BillingSubscriptionOverview | null>(null)
   const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>([])
   const [commercialBusy, setCommercialBusy] = useState<string | null>(null)
   const [commercialMessage, setCommercialMessage] = useState("")
+  const [studentVerification, setStudentVerification] = useState<StudentVerification | null>(null)
+  const [billingIntervalView, setBillingIntervalView] = useState<"monthly" | "annual">("monthly")
   const [studentEmail, setStudentEmail] = useState("")
   const [studentOtp, setStudentOtp] = useState("")
   const [studentDocumentFile, setStudentDocumentFile] = useState<File | null>(null)
   const [uploadedStudentDocument, setUploadedStudentDocument] = useState<FileRecord | null>(null)
   const [pendingVerificationId, setPendingVerificationId] = useState("")
-
+  const [studentModalOpen, setStudentModalOpen] = useState(false)
+  const [studentCheckoutPlan, setStudentCheckoutPlan] = useState<CommercialPlan | null>(null)
+  const commercialLoadedRef = useRef(false)
+  const commercialPrefetchRef = useRef(false)
+  const plansSectionRef = useRef<HTMLDivElement | null>(null)
+  const invoicesSectionRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     try {
       const savedProfile = JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null")
@@ -158,7 +199,35 @@ export function SettingsPage() {
   }, [])
 
   useEffect(() => {
+    hydrateCommercialCache()
+    if (getAccessToken() && !commercialPrefetchRef.current) {
+      commercialPrefetchRef.current = true
+      void loadCommercialData({ silent: true })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeSection !== "billing") return
+    hydrateCommercialCache()
+    void ensureRazorpayLoaded().catch(() => undefined)
+    if (commercialLoadedRef.current) return
+    commercialLoadedRef.current = true
     void loadCommercialData()
+  }, [activeSection])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const urls = ["https://checkout.razorpay.com", "https://api.razorpay.com"]
+    const links = urls.map((href) => {
+      const link = document.createElement("link")
+      link.rel = "preconnect"
+      link.href = href
+      document.head.appendChild(link)
+      return link
+    })
+    return () => {
+      links.forEach((link) => link.remove())
+    }
   }, [])
 
   useEffect(() => {
@@ -171,9 +240,22 @@ export function SettingsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (billingOverview?.subscription?.billing_interval === "annual") {
+      setBillingIntervalView("annual")
+      return
+    }
+    setBillingIntervalView("monthly")
+  }, [billingOverview?.subscription?.billing_interval, activeSection])
+
   const displayName = getUserDisplayName(profile, user.name)
   const displayEmail = profile?.email || "Signed in account"
   const displayRole = profile?.useCase || user.role
+
+  function isCommercialTimeoutMessage(message: string) {
+    const normalized = message.trim().toLowerCase()
+    return normalized.includes("taking longer than expected") || normalized.includes("signal timed out")
+  }
 
   function savePreferences(patch: Partial<typeof preferences>) {
     setPreferences((current) => {
@@ -193,19 +275,129 @@ export function SettingsPage() {
     setProfile(next)
   }
 
-  async function loadCommercialData() {
-    setCommercialBusy("load")
-    setCommercialMessage("")
+  function hydrateCommercialCache() {
+    if (typeof window === "undefined") return
     try {
-      const [overview, plans] = await Promise.all([commercialApi.overview(), commercialApi.plans()])
-      setCommercialOverview(overview)
-      setCommercialPlans(plans)
-      setPendingVerificationId(overview.student_verification?.id || "")
-      setStudentEmail(overview.student_verification?.institutional_email || "")
-    } catch (error) {
-      setCommercialMessage(error instanceof Error ? error.message : "Could not load billing and student access.")
+      const raw = window.localStorage.getItem(COMMERCIAL_CACHE_KEY)
+      if (!raw) return
+      const cached = JSON.parse(raw) as {
+        timestamp?: number
+        billingOverview?: BillingSubscriptionOverview | null
+        studentVerification?: StudentVerification | null
+        plans?: CommercialPlan[]
+      }
+      if (!cached?.timestamp || Date.now() - cached.timestamp > 10 * 60_000) return
+      if (cached.billingOverview) {
+        setBillingOverview(cached.billingOverview)
+      }
+      if (cached.studentVerification) {
+        setStudentVerification(cached.studentVerification)
+        setPendingVerificationId(cached.studentVerification.id || "")
+        setStudentEmail(cached.studentVerification.institutional_email || "")
+      }
+      if (cached.plans?.length) {
+        setCommercialPlans(cached.plans)
+      }
+    } catch {
+      // Ignore cache errors.
+    }
+  }
+
+  function persistCommercialCache(next: {
+    billingOverview?: BillingSubscriptionOverview | null
+    studentVerification?: StudentVerification | null
+    plans?: CommercialPlan[]
+  }) {
+    if (typeof window === "undefined") return
+    try {
+      const currentRaw = window.localStorage.getItem(COMMERCIAL_CACHE_KEY)
+      const current = currentRaw
+        ? (JSON.parse(currentRaw) as {
+            billingOverview?: BillingSubscriptionOverview | null
+            studentVerification?: StudentVerification | null
+            plans?: CommercialPlan[]
+          })
+        : {}
+      window.localStorage.setItem(
+        COMMERCIAL_CACHE_KEY,
+        JSON.stringify({
+          timestamp: Date.now(),
+          billingOverview: next.billingOverview ?? current.billingOverview ?? null,
+          studentVerification: next.studentVerification ?? current.studentVerification ?? null,
+          plans: next.plans ?? current.plans ?? [],
+        }),
+      )
+    } catch {
+      // Ignore cache errors.
+    }
+  }
+
+  async function loadCommercialData(options?: { silent?: boolean }) {
+    const silent = Boolean(options?.silent)
+    const hadBillingOverview = Boolean(billingOverview)
+    const hadPlans = commercialPlans.length > 0
+    if (!silent) {
+      setCommercialBusy("load")
+    }
+    if (!silent && activeSection === "billing") {
+      setCommercialMessage("")
+    }
+    try {
+      const [billingResult, plansResult] = await Promise.allSettled([commercialApi.billingOverview(), commercialApi.plans()])
+
+      if (billingResult.status === "fulfilled") {
+        setBillingOverview(billingResult.value)
+        persistCommercialCache({ billingOverview: billingResult.value })
+      }
+
+      if (plansResult.status === "fulfilled") {
+        setCommercialPlans(plansResult.value)
+        persistCommercialCache({ plans: plansResult.value })
+      }
+
+      const errors: string[] = []
+      if (billingResult.status === "rejected") {
+        errors.push(billingResult.reason instanceof Error ? billingResult.reason.message : "Billing overview is unavailable.")
+      }
+      if (plansResult.status === "rejected") {
+        errors.push(plansResult.reason instanceof Error ? plansResult.reason.message : "Plans are unavailable.")
+      }
+
+      if (errors.length && activeSection === "billing" && !silent) {
+        const hasRenderableState =
+          billingResult.status === "fulfilled" ||
+          plansResult.status === "fulfilled" ||
+          hadBillingOverview ||
+          hadPlans
+
+        if (!hasRenderableState) {
+          const firstError = errors[0] || "Could not load billing and student access."
+          setCommercialMessage(
+            isCommercialTimeoutMessage(firstError)
+              ? "Billing details are syncing. Please wait a moment."
+              : firstError,
+          )
+        } else if (billingResult.status === "fulfilled" || plansResult.status === "fulfilled") {
+          setCommercialMessage("")
+        }
+      }
     } finally {
-      setCommercialBusy(null)
+      if (!silent) {
+        setCommercialBusy(null)
+      }
+    }
+  }
+
+  async function loadStudentVerificationStatus() {
+    try {
+      const status = await commercialApi.studentStatus()
+      setStudentVerification(status)
+      setPendingVerificationId(status?.id || "")
+      setStudentEmail(status?.institutional_email || "")
+      persistCommercialCache({ studentVerification: status })
+      return status
+    } catch {
+      return null
     }
   }
 
@@ -220,7 +412,7 @@ export function SettingsPage() {
       const result = await commercialApi.startStudentEmail(studentEmail.trim())
       setPendingVerificationId(result.verification_id || "")
       setCommercialMessage(result.message)
-      await loadCommercialData()
+      await loadStudentVerificationStatus()
     } catch (error) {
       setCommercialMessage(error instanceof Error ? error.message : "Could not start student verification.")
     } finally {
@@ -236,10 +428,16 @@ export function SettingsPage() {
     setCommercialBusy("student-confirm")
     setCommercialMessage("")
     try {
-      await commercialApi.confirmStudentEmail(pendingVerificationId, studentOtp.trim())
+      const verification = await commercialApi.confirmStudentEmail(pendingVerificationId, studentOtp.trim())
+      setStudentVerification(verification)
+      persistCommercialCache({ studentVerification: verification })
       setStudentOtp("")
       setCommercialMessage("Student email verified.")
       await loadCommercialData()
+      if (studentCheckoutPlan) {
+        setStudentModalOpen(false)
+        await runTestUpgrade(studentCheckoutPlan.code, "monthly")
+      }
     } catch (error) {
       setCommercialMessage(error instanceof Error ? error.message : "Could not confirm the code.")
     } finally {
@@ -257,10 +455,16 @@ export function SettingsPage() {
     try {
       const uploaded = uploadedStudentDocument ?? await filesApi.upload(studentDocumentFile as File)
       setUploadedStudentDocument(uploaded)
-      await commercialApi.submitStudentDocument(uploaded.id)
+      const verification = await commercialApi.submitStudentDocument(uploaded.id)
+      setStudentVerification(verification)
+      persistCommercialCache({ studentVerification: verification })
       setStudentDocumentFile(null)
-      setCommercialMessage("Student document submitted for manual review.")
+      setCommercialMessage("Student document verified. Student Pro is now unlocked.")
       await loadCommercialData()
+      if (studentCheckoutPlan) {
+        setStudentModalOpen(false)
+        await runTestUpgrade(studentCheckoutPlan.code, "monthly")
+      }
     } catch (error) {
       setCommercialMessage(error instanceof Error ? error.message : "Could not submit student document.")
     } finally {
@@ -268,18 +472,122 @@ export function SettingsPage() {
     }
   }
 
-  async function runTestUpgrade(planCode: string, interval: "monthly" | "annual") {
-    setCommercialBusy(`${planCode}-${interval}`)
+  async function openStudentCheckout(plan: CommercialPlan) {
+    setStudentCheckoutPlan(plan)
+    setStudentModalOpen(true)
+    setCommercialMessage("")
+    await loadStudentVerificationStatus()
+  }
+
+  async function handleManagePlan() {
+    if (!billingOverview?.subscription?.provider_subscription_id) {
+      plansSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      setCommercialMessage("Choose a paid subscription plan to start recurring billing.")
+      return
+    }
+    invoicesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    setCommercialMessage("Your recurring subscription is active. You can cancel it below if needed.")
+  }
+
+  async function handleCancelOrResumeSubscription() {
+    if (!billingOverview?.subscription?.provider_subscription_id || billingOverview.plan.code === "FREE") {
+      setCommercialMessage("This account does not have an active recurring Razorpay subscription to manage.")
+      plansSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      return
+    }
+    setCommercialBusy("subscription-manage")
     setCommercialMessage("")
     try {
-      const result = await commercialApi.testCheckout(planCode, interval)
+      const result = billingOverview.subscription.cancel_at_period_end
+        ? await commercialApi.resumeSubscription()
+        : await commercialApi.cancelSubscription()
       setCommercialMessage(result.message)
       await loadCommercialData()
     } catch (error) {
-      setCommercialMessage(error instanceof Error ? error.message : "Could not activate the test plan.")
+      setCommercialMessage(error instanceof Error ? error.message : "Could not update the subscription.")
     } finally {
       setCommercialBusy(null)
     }
+  }
+
+  function handleInvoiceOpen(invoice: BillingInvoice) {
+    if (typeof window === "undefined") return
+    if (invoice.hosted_url) {
+      window.open(invoice.hosted_url, "_blank", "noopener,noreferrer")
+      return
+    }
+    setCommercialMessage("Invoice download will appear here once Razorpay issues the hosted invoice.")
+  }
+
+  async function runTestUpgrade(planCode: string, interval: "monthly" | "annual") {
+    setCommercialBusy(`${planCode}-${interval}`)
+    setCommercialMessage("Opening secure checkout...")
+    try {
+      const [, checkoutConfig] = await Promise.all([
+        ensureRazorpayLoaded(),
+        commercialApi.createSubscription(planCode, interval),
+      ])
+      const RazorpayCheckout = window.Razorpay
+      if (!RazorpayCheckout) {
+        throw new Error("Razorpay checkout is unavailable on this device.")
+      }
+      await new Promise<void>((resolve, reject) => {
+        const subscriptionConfig = checkoutConfig as BillingCreateSubscriptionResponse
+        const checkoutKey = subscriptionConfig.key_id || RAZORPAY_PUBLIC_KEY
+        if (!checkoutKey) {
+          reject(new Error("Razorpay public key is not configured for this environment."))
+          return
+        }
+        const checkout = new RazorpayCheckout({
+          key: checkoutKey,
+          subscription_id: subscriptionConfig.subscription_id,
+          amount: subscriptionConfig.amount,
+          currency: subscriptionConfig.currency,
+          name: subscriptionConfig.name || "CEASER",
+          description: subscriptionConfig.description || `${planCode} plan`,
+          prefill: {
+            name: subscriptionConfig.prefill_name || profileDraft.name || displayName,
+            email: subscriptionConfig.prefill_email || profileDraft.email || displayEmail,
+          },
+          theme: {
+            color: subscriptionConfig.theme_color || "#6d4cff",
+          },
+          modal: {
+            ondismiss: () => {
+              reject(new Error("Payment was cancelled."))
+            },
+          },
+          handler: async (response: Record<string, string>) => {
+            try {
+              const verified = await commercialApi.verifyPayment({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+              setCommercialMessage(verified.message || "Payment verified successfully.")
+              resolve()
+            } catch (error) {
+              reject(error)
+            }
+          },
+        })
+        checkout.on("payment.failed", () => {
+          reject(new Error("Payment failed. Please try again."))
+        })
+        checkout.open()
+      })
+      await loadCommercialData()
+    } catch (error) {
+      setCommercialMessage(error instanceof Error ? error.message : "Could not start checkout.")
+    } finally {
+      setCommercialBusy(null)
+    }
+  }
+
+  function handleSelectFreePlan() {
+    setCommercialMessage("Free access is already available. You can continue using CEASER on the Free plan anytime.")
+    plansSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   async function updatePassword() {
@@ -565,44 +873,59 @@ export function SettingsPage() {
           </div>
         )}
         {activeSection === "billing" && (() => {
-          const currentPlan = commercialOverview?.plan
-          const subscription = commercialOverview?.subscription
-          const billingInterval = subscription?.billing_interval || "monthly"
+          const fallbackPlan =
+            commercialPlans.find((plan) => plan.code === "FREE") ||
+            commercialPlans[0] ||
+            null
+          const hasPaidHistory = Boolean((billingOverview?.payments?.length || 0) > 0)
+          const hasRecurringSubscription = Boolean(billingOverview?.subscription)
+          const currentPlan =
+            billingOverview?.plan && (hasRecurringSubscription || hasPaidHistory || billingOverview.plan.code === "FREE")
+              ? billingOverview.plan
+              : fallbackPlan
+          const subscription = billingOverview?.subscription
+          const displayedPlans = commercialPlans.length
+            ? commercialPlans
+            : currentPlan
+              ? [currentPlan]
+              : []
+          const billingInterval = subscription?.billing_interval || billingIntervalView
           const billingPrice = currentPlan
             ? billingInterval === "annual"
               ? formatPrice(currentPlan.annual_price, currentPlan.currency)
               : formatPrice(currentPlan.monthly_price, currentPlan.currency)
-            : "Loading..."
-          const renewalDate = subscription?.current_period_end ? formatLongDate(subscription.current_period_end) : "28 Aug 2026"
-          const usageItems = commercialOverview?.usage ?? []
-          const planTone = getPlanTone(currentPlan?.code || "PRO")
-          const invoiceRows = getInvoiceRows(subscription, currentPlan)
+            : formatPrice(0, "INR")
+          const renewalDate = subscription?.current_period_end ? formatLongDate(subscription.current_period_end) : null
+          const usageItems = billingOverview?.usage ?? []
+          const planTone = getPlanTone(currentPlan?.code || "FREE")
+          const studentVerified = Boolean(billingOverview?.student_pricing_available)
+          const planReady = Boolean(currentPlan)
+          const friendlyCommercialMessage =
+            commercialMessage === "No Razorpay subscription found for this account." && currentPlan?.code && currentPlan.code !== "FREE"
+              ? ""
+              : commercialMessage
+          const paymentRows =
+            billingOverview?.payments?.map((payment) => ({
+              id: payment.id,
+              date: formatLongDate(payment.captured_at || new Date().toISOString()),
+              reference: payment.provider_invoice_id || payment.provider_payment_id,
+              amount: formatPrice(payment.amount, payment.currency),
+              plan: currentPlan?.name || "CEASER Plan",
+              status: payment.status || "paid",
+            })) || []
 
           return (
             <div className="max-w-6xl space-y-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold">Billing & Subscription</h2>
-                  <p className="text-muted-foreground">Manage your plan, student access, and usage limits.</p>
+                  <p className="text-muted-foreground">Manage your plan, payment history, and usage limits.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => void loadCommercialData()}
-                    disabled={commercialBusy === "load"}
-                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
-                  >
-                    <RefreshCw className={cn("h-4 w-4", commercialBusy === "load" && "animate-spin")} />
-                    Refresh
-                  </button>
-                  <button className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary">
-                    <HelpCircle className="h-4 w-4" />
-                    Billing Help
-                  </button>
-                </div>
+                {commercialBusy === "load" ? <StatusBadge label="loading" /> : null}
               </div>
 
-              {commercialMessage && (
-                <p className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">{commercialMessage}</p>
+              {friendlyCommercialMessage && (
+                <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{friendlyCommercialMessage}</p>
               )}
 
               <GlowCard className="overflow-hidden">
@@ -613,36 +936,47 @@ export function SettingsPage() {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-4xl font-bold">{currentPlan?.name || "CEASER Pro"}</h3>
+                        <h3 className="text-4xl font-bold">{currentPlan?.name || "CEASER Free"}</h3>
                         <Sparkles className="h-7 w-7 text-violet-400" />
                       </div>
                       <div className="mt-2 flex flex-wrap items-end gap-3">
                         <p className="text-3xl font-bold">{billingPrice}</p>
-                        <p className="pb-1 text-lg text-muted-foreground">/ {billingInterval === "annual" ? "year" : "month"}</p>
+                        {currentPlan ? (
+                          <p className="pb-1 text-lg text-muted-foreground">/ {billingInterval === "annual" ? "year" : "month"}</p>
+                        ) : null}
                       </div>
-                      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{currentPlan?.description || "Plan details will appear after sign in."}</p>
+                      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+                        {currentPlan?.description || "Choose the right CEASER plan for your workflow and upgrade when you're ready."}
+                      </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <StatusBadge label={subscription?.status || "checking"} />
-                      <span className="text-sm text-muted-foreground">Renews on {renewalDate}</span>
+                      <StatusBadge label={subscription?.status || (planReady ? "ready" : "not_started")} />
+                      {renewalDate ? <span className="text-sm text-muted-foreground">Renews on {renewalDate}</span> : null}
+                      {studentVerified ? <span className="text-sm text-emerald-300">Student pricing unlocked</span> : null}
+                      {!subscription && currentPlan?.code !== "FREE" && hasPaidHistory ? (
+                        <span className="text-sm text-cyan-300">Plan access is active from your latest payment</span>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-3">
                       <button
-                        onClick={() => void loadCommercialData()}
+                        onClick={() => void handleManagePlan()}
                         className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
                       >
                         <CreditCard className="h-4 w-4" />
                         Manage Plan
                       </button>
-                      <button className="inline-flex items-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-semibold transition hover:bg-secondary">
+                      <button
+                        onClick={() => void handleCancelOrResumeSubscription()}
+                        disabled={commercialBusy === "subscription-manage" || !subscription?.provider_subscription_id}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
+                      >
                         <ArrowRight className="h-4 w-4" />
-                        Cancel Subscription
+                        {commercialBusy === "subscription-manage"
+                          ? "Updating..."
+                          : subscription?.cancel_at_period_end
+                            ? "Resume Subscription"
+                            : "Cancel Subscription"}
                       </button>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <MetricCard label="Billing Cycle" value={subscription?.billing_interval || "Free"} />
-                      <MetricCard label="Provider" value={subscription?.provider || "CEASER"} />
-                      <MetricCard label="Student Pricing" value={commercialOverview?.student_pricing_available ? "Available" : "Locked"} />
                     </div>
                   </div>
 
@@ -680,7 +1014,9 @@ export function SettingsPage() {
                       <h3 className="text-lg font-semibold">Your Usage</h3>
                       <p className="text-sm text-muted-foreground">Resets with your billing cycle.</p>
                     </div>
-                    <span className="text-sm text-muted-foreground">{usageItems.length ? `Renews in ${renewalDate}` : "Usage will appear after sign in"}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {usageItems.length ? `Renews on ${renewalDate}` : "Usage will appear after the first tracked action."}
+                    </span>
                   </div>
                   {usageItems.length ? (
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -702,55 +1038,37 @@ export function SettingsPage() {
                 </GlowCard>
 
                 <GlowCard>
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex h-full flex-col justify-between gap-5">
                     <div>
-                      <h3 className="text-lg font-semibold">Student Access</h3>
-                      <p className="text-sm text-muted-foreground">Verify your institution and unlock student pricing.</p>
+                      <h3 className="text-lg font-semibold">Student Pro Access</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Student verification now appears only when someone selects Student Pro, so the main billing page stays focused.
+                      </p>
                     </div>
-                    <StatusBadge label={commercialOverview?.student_verification?.status || "not_started"} />
-                  </div>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-[1.1fr_1fr]">
-                    <div className="rounded-2xl border border-border bg-background/50 p-4">
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <p className="mt-1 text-lg font-semibold">{commercialOverview?.student_verification?.status ? humanizeEntitlement(commercialOverview.student_verification.status) : "Not started"}</p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-background/50 p-4">
-                      <p className="text-sm text-muted-foreground">Institution</p>
-                      <p className="mt-1 text-lg font-semibold">{commercialOverview?.student_verification?.institutional_email || "New Horizon College of Engineering"}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
-                        <GraduationCap className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-semibold">Student verification is ready</p>
-                        <p className="text-sm text-muted-foreground">Use your institutional email or upload a document to complete review.</p>
+                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
+                          <GraduationCap className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{studentVerified ? "Student access approved" : "Student access available at checkout"}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {studentVerified
+                              ? "Your student verification is active. Student Pro can go straight to Razorpay."
+                              : "Choose Student Pro and we’ll collect your institutional email or document in a popup before payment."}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <button
-                      onClick={() => void startStudentVerification()}
-                      disabled={commercialBusy === "student-email"}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Verify via Email
-                    </button>
-                    <button
-                      onClick={() => void submitStudentDocument()}
-                      disabled={commercialBusy === "student-document"}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
-                    >
-                      <Upload className="h-4 w-4" />
-                      Upload Document
-                    </button>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetricCard label="Status" value={studentVerification?.status ? humanizeEntitlement(studentVerification.status) : studentVerified ? "Approved" : "Not started"} />
+                      <MetricCard label="Institution" value={studentVerification?.institutional_email || "Verify during checkout"} />
+                    </div>
                   </div>
                 </GlowCard>
               </div>
 
+              <div ref={plansSectionRef}>
               <GlowCard>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -758,17 +1076,44 @@ export function SettingsPage() {
                     <p className="text-sm text-muted-foreground">Compare CEASER plans and switch when your workflow changes.</p>
                   </div>
                   <div className="inline-flex rounded-full border border-border bg-secondary/40 p-1 text-sm">
-                    <span className="rounded-full bg-primary px-4 py-1.5 font-semibold text-primary-foreground">Monthly</span>
-                    <span className="px-4 py-1.5 text-muted-foreground">Yearly</span>
+                    <button
+                      onClick={() => setBillingIntervalView("monthly")}
+                      className={cn(
+                        "rounded-full px-4 py-1.5 font-semibold transition",
+                        billingIntervalView === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setBillingIntervalView("annual")}
+                      className={cn(
+                        "rounded-full px-4 py-1.5 font-semibold transition",
+                        billingIntervalView === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Yearly
+                    </button>
                     <span className="px-4 py-1.5 text-emerald-400">Save 20%</span>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 xl:grid-cols-4">
-                  {commercialPlans.map((plan, index) => {
+                <div className="mt-6 grid gap-4 xl:grid-cols-3">
+                  {displayedPlans.map((plan, index) => {
                     const active = plan.code === currentPlan?.code
                     const colors = planToneByIndex(index)
-                    const price = formatPrice(plan.monthly_price, plan.currency)
+                    const price = formatPrice(billingIntervalView === "annual" ? plan.annual_price : plan.monthly_price, plan.currency)
+                    const lockedForStudentVerification = plan.code === "STUDENT_PRO" && !studentVerified
+                    const disabled =
+                      (plan.code === "FREE" && active) ||
+                      commercialBusy === `${plan.code}-${billingIntervalView}`
+                    const ctaLabel = active
+                      ? "Current Plan"
+                      : lockedForStudentVerification
+                        ? "Verify Student Access"
+                        : plan.code === "FREE"
+                          ? "Select Free"
+                          : "Upgrade Now"
                     return (
                       <div
                         key={plan.code}
@@ -790,7 +1135,7 @@ export function SettingsPage() {
                             <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                             <div className="mt-4 flex items-end gap-2">
                               <p className="text-3xl font-bold">{price}</p>
-                              <span className="pb-1 text-sm text-muted-foreground">/ month</span>
+                              <span className="pb-1 text-sm text-muted-foreground">/ {billingIntervalView === "annual" ? "year" : "month"}</span>
                             </div>
                           </div>
                           <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
@@ -802,8 +1147,16 @@ export function SettingsPage() {
                             ))}
                           </ul>
                           <button
-                            onClick={() => void runTestUpgrade(plan.code, "monthly")}
-                            disabled={plan.code === "FREE" || commercialBusy === `${plan.code}-monthly`}
+                            onClick={() =>
+                              void (
+                                plan.code === "FREE"
+                                  ? handleSelectFreePlan()
+                                  : lockedForStudentVerification
+                                    ? openStudentCheckout(plan)
+                                    : runTestUpgrade(plan.code, billingIntervalView)
+                              )
+                            }
+                            disabled={disabled}
                             className={cn(
                               "mt-6 inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45",
                               active
@@ -811,53 +1164,166 @@ export function SettingsPage() {
                                 : "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
                             )}
                           >
-                            {active ? "Current Plan" : "Upgrade Now"}
+                            {ctaLabel}
                           </button>
+                          {lockedForStudentVerification ? (
+                            <p className="mt-2 text-xs text-amber-300">Student verification is required before checkout.</p>
+                          ) : null}
                         </div>
                       </div>
                     )
                   })}
                 </div>
+                {!displayedPlans.length ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                    Plans are being prepared. Refresh once if they do not appear.
+                  </div>
+                ) : null}
               </GlowCard>
+              </div>
 
+              <div ref={invoicesSectionRef}>
               <GlowCard>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold">Payment History</h3>
                     <p className="text-sm text-muted-foreground">Recent billing activity for your CEASER account.</p>
                   </div>
-                  <button className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+                  <button
+                    onClick={() => invoicesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                  >
                     View all invoices
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="mt-5 space-y-3">
-                  {invoiceRows.map((row) => (
-                    <div key={row.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-background/50 px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
-                          <CircleCheck className="h-5 w-5" />
+                  {paymentRows.length ? (
+                    paymentRows.map((row, index) => {
+                      const invoice = billingOverview?.invoices?.[index]
+                      const invoiceActionLabel = invoice?.hosted_url
+                        ? "Open Invoice"
+                        : row.status === "captured" || row.status === "paid"
+                          ? "Payment Recorded"
+                          : "Invoice Pending"
+                      return (
+                      <div key={row.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-background/50 px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+                            <CircleCheck className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">{row.date}</p>
+                            <p className="text-sm text-muted-foreground">{row.reference}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold">{row.date}</p>
-                          <p className="text-sm text-muted-foreground">{row.reference}</p>
+                        <div className="min-w-[180px] text-left sm:text-right">
+                          <p className="font-semibold">{row.amount}</p>
+                          <p className="text-sm text-muted-foreground">{row.plan}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <StatusBadge label={row.status} />
+                          <button
+                            onClick={() => invoice && handleInvoiceOpen(invoice)}
+                            disabled={!invoice?.hosted_url}
+                            className="inline-flex items-center gap-2 rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Download className="h-4 w-4" />
+                            {invoiceActionLabel}
+                          </button>
                         </div>
                       </div>
-                      <div className="min-w-[180px] text-left sm:text-right">
-                        <p className="font-semibold">{row.amount}</p>
-                        <p className="text-sm text-muted-foreground">{row.plan}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <StatusBadge label={row.status} />
-                        <button className="inline-flex items-center gap-2 rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary">
-                          <Download className="h-4 w-4" />
-                          Download Invoice
-                        </button>
-                      </div>
+                    )})
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                      Payment history will appear after your first verified subscription payment.
                     </div>
-                  ))}
+                  )}
                 </div>
               </GlowCard>
+              </div>
+
+              {studentModalOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setStudentModalOpen(false)}>
+                  <div className="w-full max-w-2xl rounded-[2rem] border border-border bg-card p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-2xl font-bold">Unlock Student Pro</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Verify your student access once, then we&apos;ll continue directly into Razorpay for {studentCheckoutPlan?.name || "Student Pro"}.
+                        </p>
+                      </div>
+                      <button onClick={() => setStudentModalOpen(false)} className="rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-secondary">
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                      <div className="space-y-4 rounded-3xl border border-border bg-background/40 p-5">
+                        <div>
+                          <h4 className="text-lg font-semibold">Verify with institutional email</h4>
+                          <p className="text-sm text-muted-foreground">Fastest path for approved NHCE student accounts.</p>
+                        </div>
+                        <input
+                          type="email"
+                          value={studentEmail}
+                          onChange={(event) => setStudentEmail(event.target.value)}
+                          placeholder="student@newhorizonindia.edu"
+                          className="w-full rounded-2xl border border-border bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                          <input
+                            type="text"
+                            value={studentOtp}
+                            onChange={(event) => setStudentOtp(event.target.value)}
+                            placeholder="Enter 6-digit code"
+                            className="w-full rounded-2xl border border-border bg-background px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                          <button
+                            onClick={() => void confirmStudentVerification()}
+                            disabled={commercialBusy === "student-confirm"}
+                            className="rounded-2xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => void startStudentVerification()}
+                          disabled={commercialBusy === "student-email"}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Send Verification Code
+                        </button>
+                      </div>
+
+                      <div className="space-y-4 rounded-3xl border border-border bg-background/40 p-5">
+                        <div>
+                          <h4 className="text-lg font-semibold">Upload student document</h4>
+                          <p className="text-sm text-muted-foreground">Upload your ID card or proof document to unlock Student Pro immediately.</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp"
+                          onChange={(event) => setStudentDocumentFile(event.target.files?.[0] || null)}
+                          className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-xl file:border-0 file:bg-primary/15 file:px-4 file:py-2 file:font-semibold file:text-primary"
+                        />
+                        <button
+                          onClick={() => void submitStudentDocument()}
+                          disabled={commercialBusy === "student-document"}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:opacity-50"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload and Continue
+                        </button>
+                        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-muted-foreground">
+                          Current status: <span className="font-semibold text-foreground">{studentVerification?.status ? humanizeEntitlement(studentVerification.status) : "Not started"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )
         })()}
@@ -1034,23 +1500,26 @@ export function SettingsPage() {
 
 function UsageTile({ item, tone }: { item: { entitlement_key: string; limit_value: number; used_quantity: number; remaining: number; reset_period: string }, tone: { bar: string; text: string } }) {
   const percentage = Math.min(100, Math.round((item.used_quantity / Math.max(1, item.limit_value)) * 100))
+  const isCapacityMetric = item.reset_period === "never" && item.used_quantity === 0
+  const usageLabel = isCapacityMetric ? `${item.limit_value} available` : `${item.used_quantity}/${item.limit_value}`
+  const helperLabel = isCapacityMetric ? "Included with your current plan" : `${item.remaining} remaining - resets ${item.reset_period}`
   return (
     <div className="rounded-2xl border border-border bg-background/50 p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="font-medium">{humanizeEntitlement(item.entitlement_key)}</p>
-        <span className="text-sm text-muted-foreground">{item.used_quantity}/{item.limit_value}</span>
+        <span className="text-sm text-muted-foreground">{usageLabel}</span>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
         <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${percentage}%` }} />
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">{item.remaining} remaining · resets {item.reset_period}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{helperLabel}</p>
     </div>
   )
 }
 
 function getPlanTone(code: string) {
   if (code === "FREE") return { label: "Starter access", colors: [{ bar: "bg-slate-500", text: "text-slate-300" }] }
-  if (code === "STUDENT") return { label: "Student pricing", colors: [{ bar: "bg-emerald-500", text: "text-emerald-300" }, { bar: "bg-cyan-500", text: "text-cyan-300" }] }
+  if (code === "STUDENT_PRO") return { label: "Student pricing", colors: [{ bar: "bg-emerald-500", text: "text-emerald-300" }, { bar: "bg-cyan-500", text: "text-cyan-300" }] }
   if (code === "TEAM") return { label: "Team workspace", colors: [{ bar: "bg-orange-500", text: "text-orange-300" }, { bar: "bg-violet-500", text: "text-violet-300" }] }
   return { label: "Pro access", colors: [{ bar: "bg-primary", text: "text-primary" }, { bar: "bg-cyan-500", text: "text-cyan-300" }] }
 }
@@ -1067,7 +1536,7 @@ function planToneByIndex(index: number) {
 
 function getPlanPerks(code: string) {
   if (code === "FREE") return ["Basic AI chat", "Limited projects", "Standard models", "Community support"]
-  if (code === "STUDENT") return ["Everything in Pro", "Student discount", "Priority support", "Early access"]
+  if (code === "STUDENT_PRO") return ["Unlimited AI messages", "AI models", "Desktop companion", "Academic tools", "Priority support"]
   if (code === "TEAM") return ["Everything in Pro", "Team workspace", "Admin controls", "Usage analytics", "Dedicated support"]
   return ["Unlimited AI messages", "AI models", "Desktop companion", "Advanced tools", "Priority support"]
 }
@@ -1221,5 +1690,7 @@ function getMfaSecret(enrollment: Record<string, unknown>) {
   const totp = enrollment.totp as Record<string, unknown> | undefined
   return String(totp?.secret || "")
 }
+
+
 
 

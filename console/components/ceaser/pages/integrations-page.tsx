@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { cn } from "@/lib/utils"
 import {
@@ -27,7 +27,7 @@ import {
   Users,
 } from "lucide-react"
 
-type Filter = "all" | "connected" | "available" | "account" | "permissions"
+type Filter = "all" | "connected" | "available"
 
 const liveProviders = new Set(["google-calendar", "gmail", "google-drive", "google-tasks", "google-classroom"])
 
@@ -52,9 +52,11 @@ export function IntegrationsPage() {
   const [selectedId, setSelectedId] = useState("gmail")
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [message, setMessage] = useState("")
+  const integrationsRef = useRef<IntegrationRecord[]>(fallbackProviders)
+  const busyProviderRef = useRef<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -70,15 +72,23 @@ export function IntegrationsPage() {
       window.history.replaceState({}, "", `${window.location.pathname}?view=integrations`)
     }
 
-    window.setTimeout(() => void loadIntegrations({ showLoading: false, showErrors: false }), 150)
+    void loadIntegrations({ showLoading: true, showErrors: false })
   }, [])
+
+  useEffect(() => {
+    integrationsRef.current = integrations
+  }, [integrations])
+
+  useEffect(() => {
+    busyProviderRef.current = busyProvider
+  }, [busyProvider])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       void syncConnectedIntegrations()
     }, 5 * 60 * 1000)
     return () => window.clearInterval(timer)
-  }, [integrations, busyProvider])
+  }, [])
 
   async function loadIntegrations(options: { showLoading?: boolean; showErrors?: boolean } = {}) {
     if (options.showLoading) setIsLoading(true)
@@ -151,8 +161,8 @@ export function IntegrationsPage() {
   }
 
   async function syncConnectedIntegrations() {
-    if (busyProvider) return
-    const connected = integrations.filter((item) => item.connected && liveProviders.has(item.id))
+    if (busyProviderRef.current) return
+    const connected = integrationsRef.current.filter((item) => item.connected && liveProviders.has(item.id))
     if (!connected.length) return
     await Promise.allSettled(connected.map((item) => integrationsApi.sync(item.id)))
     await loadIntegrations({ showErrors: false })
@@ -171,9 +181,7 @@ export function IntegrationsPage() {
     const matchesFilter =
       filter === "all" ||
       (filter === "connected" && item.connected) ||
-      (filter === "available" && !item.connected) ||
-      filter === "account" ||
-      filter === "permissions"
+      (filter === "available" && !item.connected)
     return matchesQuery && matchesFilter
   })
 
@@ -202,8 +210,6 @@ export function IntegrationsPage() {
             <Tab label="All Integrations" active={filter === "all"} onClick={() => setFilter("all")} />
             <Tab label={`Connected (${connectedCount})`} active={filter === "connected"} onClick={() => setFilter("connected")} />
             <Tab label={`Available (${availableCount})`} active={filter === "available"} onClick={() => setFilter("available")} />
-            <Tab label="Account" active={filter === "account"} onClick={() => setFilter("account")} />
-            <Tab label="Data & Permissions" active={filter === "permissions"} onClick={() => setFilter("permissions")} />
           </div>
 
           {message && <p className="mb-4 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">{message}</p>}

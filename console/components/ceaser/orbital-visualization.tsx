@@ -16,19 +16,19 @@ export function OrbitalVisualization({ className, selectedAgentId, onAgentClick 
   const activeAgents = agents.filter((agent) => isAgentEnabled(agent.id))
 
   const agentPositions = [
-    { angle: -60, radius: 140, agent: agents.find((agent) => agent.id === "bolt") },
-    { angle: -120, radius: 140, agent: agents.find((agent) => agent.id === "alex") },
-    { angle: 180, radius: 140, agent: agents.find((agent) => agent.id === "friday") },
-    { angle: 120, radius: 160, agent: agents.find((agent) => agent.id === "zeus") },
-    { angle: 60, radius: 140, agent: agents.find((agent) => agent.id === "atlas") },
-    { angle: 0, radius: 160, agent: agents.find((agent) => agent.id === "nova") },
+    { angle: -60, radius: 172, agent: agents.find((agent) => agent.id === "bolt") },
+    { angle: -120, radius: 172, agent: agents.find((agent) => agent.id === "alex") },
+    { angle: 180, radius: 172, agent: agents.find((agent) => agent.id === "friday") },
+    { angle: 120, radius: 188, agent: agents.find((agent) => agent.id === "zeus") },
+    { angle: 60, radius: 172, agent: agents.find((agent) => agent.id === "atlas") },
+    { angle: 0, radius: 188, agent: agents.find((agent) => agent.id === "nova") },
   ]
 
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
       <div className="absolute inset-0 neural-grid opacity-30" />
 
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 400">
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 440 440">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#0284c7" stopOpacity="0.48" />
@@ -50,9 +50,9 @@ export function OrbitalVisualization({ className, selectedAgentId, onAgentClick 
         </defs>
 
         <circle
-          cx="200"
-          cy="200"
-          r="160"
+          cx="220"
+          cy="220"
+          r="188"
           fill="none"
           stroke="url(#ringGradient)"
           strokeWidth="1.7"
@@ -62,9 +62,9 @@ export function OrbitalVisualization({ className, selectedAgentId, onAgentClick 
         />
 
         <circle
-          cx="200"
-          cy="200"
-          r="120"
+          cx="220"
+          cy="220"
+          r="144"
           fill="none"
           stroke="url(#ringGradient)"
           strokeWidth="1.35"
@@ -74,9 +74,9 @@ export function OrbitalVisualization({ className, selectedAgentId, onAgentClick 
         />
 
         <circle
-          cx="200"
-          cy="200"
-          r="160"
+          cx="220"
+          cy="220"
+          r="188"
           fill="none"
           stroke="url(#sweepGradient)"
           strokeWidth="3"
@@ -90,13 +90,13 @@ export function OrbitalVisualization({ className, selectedAgentId, onAgentClick 
         {activeAgents.map((agent) => {
           const pos = agentPositions.find((item) => item.agent?.id === agent.id)
           if (!pos || selectedAgentId === agent.id) return null
-          const x = 200 + pos.radius * Math.cos((pos.angle * Math.PI) / 180)
-          const y = 200 + pos.radius * Math.sin((pos.angle * Math.PI) / 180)
+          const x = 220 + pos.radius * Math.cos((pos.angle * Math.PI) / 180)
+          const y = 220 + pos.radius * Math.sin((pos.angle * Math.PI) / 180)
           return (
             <line
               key={agent.id}
-              x1="200"
-              y1="200"
+              x1="220"
+              y1="220"
               x2={x}
               y2={y}
               stroke={agent.color}

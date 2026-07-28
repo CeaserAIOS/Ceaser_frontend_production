@@ -35,6 +35,7 @@ interface Message {
 const ACTIVE_CONVERSATION_KEY = "ceaser_active_conversation_id"
 const SAVED_RESPONSES_KEY = "ceaser_saved_responses"
 const SAVED_RESPONSE_EVENT = "ceaser_saved_response"
+const ENABLE_CHAT_SUGGESTIONS = false
 
 interface SavedResponse {
   id: string
@@ -940,9 +941,11 @@ export function ChatPage() {
                   <span className="text-white/82">What can I help with?</span>
                 </h1>
 
-                <div className="mt-7 grid gap-4 md:grid-cols-3">
+                <div className={cn("mt-7 grid gap-4", ENABLE_CHAT_SUGGESTIONS ? "md:grid-cols-3" : "md:grid-cols-2")}>
                   <PromptCard color="cyan" title="Content Help" text="Help with me create a Presentation" onClick={() => setInput("Help me create a presentation about ")} />
-                  <PromptCard color="rose" title="Suggestions" text="Help with me ideas" onClick={() => setInput("Give me suggestions for ")} />
+                  {ENABLE_CHAT_SUGGESTIONS ? (
+                    <PromptCard color="rose" title="Suggestions" text="Help with me ideas" onClick={() => setInput("Give me suggestions for ")} />
+                  ) : null}
                   <PromptCard color="green" title="Job Application" text="Help with me apply for job application" onClick={() => setInput("Help me prepare a job application for ")} />
                 </div>
 
@@ -1227,7 +1230,7 @@ function ResponseActions({
 
   return (
     <div className="mt-4 space-y-3">
-      {proactiveSuggestions.length && (hasBackendSuggestions || !message.isStreaming) ? (
+      {ENABLE_CHAT_SUGGESTIONS && proactiveSuggestions.length && (hasBackendSuggestions || !message.isStreaming) ? (
         <div>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Next suggestions</p>
           <div className="flex flex-wrap gap-2">

@@ -3,7 +3,6 @@
 import { AppProvider } from "@/lib/app-context"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
-import { CommandBar } from "./command-bar"
 import { VoiceModal } from "./modals/voice-modal"
 import { SearchModal } from "./modals/search-modal"
 import { AgentConfigModal } from "./modals/agent-config-modal"
@@ -30,7 +29,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               <main className="min-h-0 flex-1 overflow-y-auto">
                 {children}
               </main>
-              <CommandBar />
             </div>
           </div>
         </div>

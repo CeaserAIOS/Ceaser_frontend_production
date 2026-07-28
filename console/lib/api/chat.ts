@@ -1,4 +1,4 @@
-import { apiRequest, apiStreamRequest } from "./client"
+import { apiRequest, apiStreamRequest, invalidateApiCache } from "./client"
 
 export interface ChatMessage {
   id: string
@@ -118,15 +118,24 @@ export const chatApi = {
     apiRequest<ConversationRecord>("/conversations", {
       method: "POST",
       body: { title },
+    }).then((response) => {
+      invalidateApiCache(["/conversations", "/chat/conversations"])
+      return response
     }),
   updateConversation: (conversationId: string, updates: Partial<Pick<ConversationRecord, "title" | "pinned" | "archived">>) =>
     apiRequest<ConversationRecord>(`/conversations/${conversationId}`, {
       method: "PATCH",
       body: updates,
+    }).then((response) => {
+      invalidateApiCache([`/conversations/${conversationId}`, "/conversations", `/chat/conversations/${conversationId}/messages`])
+      return response
     }),
   deleteConversation: (conversationId: string) =>
     apiRequest<void>(`/conversations/${conversationId}`, {
       method: "DELETE",
+    }).then((response) => {
+      invalidateApiCache([`/conversations/${conversationId}`, "/conversations", `/chat/conversations/${conversationId}/messages`])
+      return response
     }),
   listMessages: (conversationId: string, limit = 60) =>
     apiRequest<ChatMessage[]>(`/chat/conversations/${conversationId}/messages?limit=${limit}`, { cacheTtlMs: 300000 }),
@@ -134,6 +143,9 @@ export const chatApi = {
     apiRequest<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
       method: "POST",
       body: { content, role, metadata },
+    }).then((response) => {
+      invalidateApiCache(["/conversations", `/chat/conversations/${conversationId}/messages`])
+      return response
     }),
   sendCeaserMessage: (message: string, conversationId?: string, fileIds?: string[]) =>
     apiRequest<CeaserChatResponse>("/ceaser/chat", {
@@ -143,6 +155,9 @@ export const chatApi = {
         conversation_id: conversationId,
         file_ids: fileIds ?? [],
       },
+    }).then((response) => {
+      invalidateApiCache(["/conversations", conversationId ? `/chat/conversations/${conversationId}/messages` : "/chat/conversations"])
+      return response
     }),
   sendCeaserMessageStream: (
     message: string,

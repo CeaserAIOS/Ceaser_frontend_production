@@ -13,7 +13,6 @@ import { GlowCard, StatCard } from "../glow-card"
 import { OrbitalVisualization } from "../orbital-visualization"
 import { motion } from "framer-motion"
 import { 
-  Play, 
   FolderKanban, 
   CheckSquare, 
   Target, 
@@ -35,7 +34,7 @@ function getMemoryDescription(memory: MemoryRecord) {
 }
 
 export function MissionControl() {
-  const { selectedAgentId, setSelectedAgentId, setCurrentPage, setIsVoiceModalOpen } = useApp()
+  const { selectedAgentId, setSelectedAgentId, setCurrentPage } = useApp()
   const { isAgentEnabled } = useAgentStore()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [memories, setMemories] = useState<MemoryRecord[]>([])
@@ -106,18 +105,9 @@ export function MissionControl() {
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Agents, memory, files, and workflows are arranged as one live operating layer.</p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           {/* Left Column */}
           <div className="space-y-6">
-            {/* Listen to Briefing Button */}
-            <button 
-              onClick={() => setIsVoiceModalOpen(true)}
-              className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2 text-sm font-medium text-primary shadow-[0_0_24px_rgba(79,140,255,0.12)] transition-colors hover:bg-primary/20"
-            >
-              <Play className="h-4 w-4" />
-              Listen to Briefing
-            </button>
-
             {/* Stats Grid */}
             <GlowCard>
               <div className="grid grid-cols-2 gap-4">
@@ -166,7 +156,7 @@ export function MissionControl() {
                 </button>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {activeAgents.slice(0, 4).map((agent) => {
+                {activeAgents.map((agent) => {
                   return (
                     <GlowCard 
                       key={agent.id} 
@@ -194,7 +184,7 @@ export function MissionControl() {
           </div>
 
           {/* Right Column - Orbital Visualization */}
-          <div className="relative min-h-[400px]">
+          <div className="relative min-h-[520px] xl:min-h-[600px]">
             <OrbitalVisualization
               className="h-full w-full"
               selectedAgentId={selectedAgentId}

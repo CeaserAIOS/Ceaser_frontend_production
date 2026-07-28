@@ -206,7 +206,7 @@ export async function apiStreamRequest(
   const dispatchEvent = (raw: string) => {
     const lines = raw.split("\n")
     const eventName = lines.find((line) => line.startsWith("event:"))?.replace("event:", "").trim()
-    const dataLine = lines.find((line) => line.startsWith("data:"))?.replace("data:", "").trim()
+    const dataLine = lines.find((line) => line.startsWith("data:"))?.replace(/^data:\s?/, "")
     if (!eventName || !dataLine) return
     let payload: Record<string, unknown> | string = dataLine
     try {
@@ -241,6 +241,7 @@ function canCache(path: string) {
     "/agents",
     "/agent-workbenches",
     "/automations",
+    "/chat/conversations",
     "/conversations",
     "/documents",
     "/drafts",

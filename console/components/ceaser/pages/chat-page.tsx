@@ -19,6 +19,7 @@ interface Message {
   role: "user" | "assistant" | "system"
   content: string
   timestamp: string
+  metadata?: MessageMetadata
   agentIds?: string[]
   highlights?: string[]
   memoriesUsed?: RankedMemory[]
@@ -27,6 +28,7 @@ interface Message {
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
   isTyping?: boolean
+  isStreaming?: boolean
 }
 
 const ACTIVE_CONVERSATION_KEY = "ceaser_active_conversation_id"
@@ -84,6 +86,78 @@ const formatTime = (value?: string) => {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
+const safeArray = <T,>(value: T[] | null | undefined) => (Array.isArray(value) ? value : [])
+
+const buildHighlights = (metadata: MessageMetadata) =>
+  [
+    metadata.scope ? `Scope: ${metadata.scope}` : null,
+    metadata.selected_agents?.length ? `Selected Agents: ${metadata.selected_agents.join(", ")}` : null,
+    metadata.workflow ? `Workflow: ${metadata.workflow.type}` : null,
+    `Memories Used: ${safeArray(metadata.memories_used).length}`,
+    `Sources: ${metadata.research?.sources?.length ?? 0}`,
+  ].filter(Boolean) as string[]
+
+const normalizeChatResponse = (response: CeaserChatResponse): CeaserChatResponse => ({
+  ...response,
+  selected_agents: safeArray(response.selected_agents),
+  contributions: safeArray(response.contributions),
+  memories_used: safeArray(response.memories_used),
+  suggestions: safeArray(response.suggestions),
+  research: response.research
+    ? {
+        ...response.research,
+        key_findings: safeArray(response.research.key_findings),
+        sources: safeArray(response.research.sources),
+        citations: safeArray(response.research.citations),
+      }
+    : null,
+  workflow: response.workflow
+    ? {
+        ...response.workflow,
+        steps: safeArray(response.workflow.steps),
+      }
+    : null,
+})
+
+const normalizeMessage = (message: ChatMessage): Message => ({
+  id: message.id,
+  role: message.role,
+  content: message.content ?? "",
+  timestamp: formatTime(message.created_at),
+  metadata: metadataFromRecord(message),
+  ...richMessageFields(message),
+})
+
+const responseToMessage = (messageId: string, response: CeaserChatResponse): Message => {
+  const normalized = normalizeChatResponse(response)
+  const metadata: MessageMetadata = {
+    scope: normalized.scope,
+    selected_agents: normalized.selected_agents,
+    contributions: normalized.contributions,
+    contribution_summary: normalized.contribution_summary,
+    memories_used: normalized.memories_used,
+    research: normalized.research,
+    workflow: normalized.workflow,
+    context_summary: normalized.context_summary,
+    suggestions: normalized.suggestions,
+  }
+
+  return {
+    id: messageId,
+    role: "assistant",
+    content: normalized.response ?? "",
+    timestamp: formatTime(),
+    metadata,
+    agentIds: normalized.selected_agents.map(agentNameToId),
+    memoriesUsed: normalized.memories_used,
+    contributions: normalized.contributions,
+    contributionSummary: normalized.contribution_summary,
+    research: normalized.research,
+    workflow: normalized.workflow,
+    highlights: buildHighlights(metadata),
+  }
+}
+
 const metadataFromRecord = (message: ChatMessage): MessageMetadata => {
   const recordWithAlias = message as ChatMessage & { extra_metadata?: MessageMetadata }
   const metadata = message.metadata ?? recordWithAlias.extra_metadata ?? {}
@@ -105,22 +179,19 @@ const metadataFromRecord = (message: ChatMessage): MessageMetadata => {
 
 const richMessageFields = (message: ChatMessage): Partial<Message> => {
   const metadata = metadataFromRecord(message)
-  const selectedAgents = metadata.selected_agents ?? []
-  const memoriesUsed = metadata.memories_used ?? []
+  const selectedAgents = safeArray(metadata.selected_agents)
+  const memoriesUsed = safeArray(metadata.memories_used)
   const highlights =
     message.role === "assistant" && (selectedAgents.length || metadata.scope || memoriesUsed.length)
-      ? [
-          metadata.scope ? `Scope: ${metadata.scope}` : null,
-          selectedAgents.length ? `Selected Agents: ${selectedAgents.join(", ")}` : null,
-          `Memories Used: ${memoriesUsed.length}`,
-        ].filter(Boolean) as string[]
+      ? buildHighlights(metadata).filter((item) => !item.startsWith("Sources:") && !item.startsWith("Workflow:"))
       : undefined
 
   return {
+    metadata,
     agentIds: selectedAgents.length ? selectedAgents.map(agentNameToId) : undefined,
     highlights,
     memoriesUsed,
-    contributions: metadata.contributions,
+    contributions: safeArray(metadata.contributions),
     contributionSummary: metadata.contribution_summary,
     research: metadata.research,
     workflow: metadata.workflow,
@@ -144,8 +215,15 @@ export function ChatPage() {
   const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isConversationLoading, setIsConversationLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
+  const preferredConversationRef = useRef<string | null>(null)
+  const conversationCacheRef = useRef(new Map<string, Message[]>())
+  const conversationRequestCacheRef = useRef(new Map<string, Promise<Message[]>>())
+  const loadRequestRef = useRef(0)
+  const streamAbortRef = useRef<AbortController | null>(null)
+  const streamSessionRef = useRef(0)
 
   const latestAssistantIntel = useMemo(
     () => [...messages].reverse().find((message) => message.role === "assistant" && (message.workflow || message.research || message.memoriesUsed?.length || message.contributions?.length)),
@@ -164,48 +242,77 @@ export function ChatPage() {
     return savedResponses.filter((item) => `${item.title} ${item.content}`.toLowerCase().includes(query))
   }, [savedResponses, searchQuery])
 
+  const cancelActiveStream = useCallback(() => {
+    streamSessionRef.current += 1
+    streamAbortRef.current?.abort()
+    streamAbortRef.current = null
+    setIsLoading(false)
+  }, [])
+
   const loadMessages = useCallback(async (conversationId: string) => {
+    const cached = conversationCacheRef.current.get(conversationId)
+    if (cached) {
+      setMessages(cached)
+      setLoadError(null)
+      setIsConversationLoading(false)
+    } else {
+      setMessages([])
+      setIsConversationLoading(true)
+    }
+
+    const requestId = ++loadRequestRef.current
     try {
-      const records = await chatApi.listMessages(conversationId)
-      setMessages(
-        records.map((message) => ({
-          id: message.id,
-          role: message.role,
-          content: message.content,
-          timestamp: formatTime(message.created_at),
-          ...richMessageFields(message),
-        })),
-      )
+      let request = conversationRequestCacheRef.current.get(conversationId)
+      if (!request) {
+        request = chatApi.listMessages(conversationId).then((records) => records.map(normalizeMessage))
+        conversationRequestCacheRef.current.set(conversationId, request)
+      }
+      const normalized = await request
+      if (requestId !== loadRequestRef.current) return
+      conversationCacheRef.current.set(conversationId, normalized)
+      setMessages(normalized)
       setLoadError(null)
     } catch (error) {
+      if (requestId !== loadRequestRef.current) return
       setMessages([])
       setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
+    } finally {
+      conversationRequestCacheRef.current.delete(conversationId)
+      if (requestId === loadRequestRef.current) {
+        setIsConversationLoading(false)
+      }
     }
   }, [])
 
-  const loadConversations = useCallback(async (preferredConversationId?: string | null) => {
+  const loadConversations = useCallback(async () => {
     try {
       const records = await chatApi.listConversations(showArchivedChats)
       setConversations(records)
-      const selected = records.find((item) => item.id === preferredConversationId) ?? records[0]
-      if (selected) {
-        setActiveConversationId(selected.id)
-        window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, selected.id)
-        await loadMessages(selected.id)
-      } else {
-        setActiveConversationId(null)
-        setMessages([])
-        window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
-      }
       setLoadError(null)
+      for (const conversation of records.slice(0, 5)) {
+        if (conversationCacheRef.current.has(conversation.id) || conversationRequestCacheRef.current.has(conversation.id)) continue
+        const request = chatApi
+          .listMessages(conversation.id, 24)
+          .then((messages) => messages.map(normalizeMessage))
+          .then((normalized) => {
+            if (!conversationCacheRef.current.has(conversation.id)) {
+              conversationCacheRef.current.set(conversation.id, normalized)
+            }
+            return normalized
+          })
+          .catch(() => [])
+          .finally(() => {
+            conversationRequestCacheRef.current.delete(conversation.id)
+          })
+        conversationRequestCacheRef.current.set(conversation.id, request)
+      }
+      return records
     } catch (error) {
       setConversations([])
-      setActiveConversationId(null)
-      setMessages([])
-      window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
       setLoadError(error instanceof Error ? error.message : "Conversation history is still loading.")
+      return [] as ConversationRecord[]
     }
-  }, [loadMessages, showArchivedChats])
+  }, [showArchivedChats])
 
   const refreshConversationList = useCallback(async () => {
     try {
@@ -221,11 +328,21 @@ export function ChatPage() {
     const boot = async () => {
       setIsBooting(true)
       try {
-        await loadConversations(window.localStorage.getItem(ACTIVE_CONVERSATION_KEY))
+        preferredConversationRef.current = window.localStorage.getItem(ACTIVE_CONVERSATION_KEY)
         const seed = window.localStorage.getItem("ceaser_chat_seed")
         if (seed) {
           setInput(seed)
           window.localStorage.removeItem("ceaser_chat_seed")
+        }
+        setActiveConversationId(null)
+        setMessages([])
+        const records = await loadConversations()
+        const preferredId = preferredConversationRef.current
+        if (preferredId && records.some((conversation) => conversation.id === preferredId)) {
+          setActiveConversationId(preferredId)
+          void loadMessages(preferredId)
+        } else {
+          window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
         }
       } finally {
         setIsBooting(false)
@@ -260,28 +377,38 @@ export function ChatPage() {
   }, [])
 
   useEffect(() => {
-    if (!showSavedResponses) void loadConversations(showArchivedChats ? null : window.localStorage.getItem(ACTIVE_CONVERSATION_KEY))
+    if (!showSavedResponses) void loadConversations()
   }, [showArchivedChats, showSavedResponses, loadConversations])
 
+  const queueFollowUp = useCallback((prompt: string) => {
+    setInput(prompt)
+  }, [])
+
   const handleNewChat = async () => {
+    cancelActiveStream()
     if (showArchivedChats) setShowArchivedChats(false)
     if (showSavedResponses) setShowSavedResponses(false)
-    const conversation = await chatApi.createConversation()
-    setConversations((current) => [conversation, ...current])
-    setActiveConversationId(conversation.id)
-    window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, conversation.id)
+    setActiveConversationId(null)
+    window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
     setMessages([])
+    setLoadError(null)
+    setIsConversationLoading(false)
+    setAttachedFiles([])
   }
 
   const handleSelectConversation = async (conversationId: string) => {
+    if (activeConversationId === conversationId) return
+    cancelActiveStream()
     setShowSavedResponses(false)
     setOpenConversationMenuId(null)
     setActiveConversationId(conversationId)
     window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, conversationId)
-    await loadMessages(conversationId)
+    setLoadError(null)
+    void loadMessages(conversationId)
   }
 
   const handleSelectSavedResponse = (response: SavedResponse) => {
+    cancelActiveStream()
     setActiveConversationId(null)
     window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
     setMessages([
@@ -292,6 +419,7 @@ export function ChatPage() {
         timestamp: formatTime(response.createdAt),
       },
     ])
+    setIsConversationLoading(false)
   }
 
   const handleRenameConversation = async (conversation: ConversationRecord) => {
@@ -318,12 +446,14 @@ export function ChatPage() {
     const remaining = conversations.filter((item) => item.id !== conversation.id)
     setConversations(remaining)
     setOpenConversationMenuId(null)
+    conversationCacheRef.current.delete(conversation.id)
     if (activeConversationId === conversation.id) {
+      cancelActiveStream()
       const next = remaining[0]
       setActiveConversationId(next?.id ?? null)
       if (next) {
         window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, next.id)
-        await loadMessages(next.id)
+        void loadMessages(next.id)
       } else {
         window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
         setMessages([])
@@ -336,12 +466,14 @@ export function ChatPage() {
     const remaining = conversations.filter((item) => item.id !== conversation.id)
     setConversations(remaining)
     setOpenConversationMenuId(null)
+    conversationCacheRef.current.delete(conversation.id)
     if (activeConversationId === conversation.id) {
+      cancelActiveStream()
       const next = remaining[0]
       setActiveConversationId(next?.id ?? null)
       if (next) {
         window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, next.id)
-        await loadMessages(next.id)
+        void loadMessages(next.id)
       } else {
         window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
         setMessages([])
@@ -361,12 +493,14 @@ export function ChatPage() {
     const remaining = conversations.filter((item) => item.id !== conversation.id)
     setConversations(remaining)
     setOpenConversationMenuId(null)
+    conversationCacheRef.current.delete(conversation.id)
     if (activeConversationId === conversation.id) {
+      cancelActiveStream()
       const next = remaining[0]
       setActiveConversationId(next?.id ?? null)
       if (next) {
         window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, next.id)
-        await loadMessages(next.id)
+        void loadMessages(next.id)
       } else {
         window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY)
         setMessages([])
@@ -403,6 +537,7 @@ export function ChatPage() {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
+    cancelActiveStream()
     const content = input.trim()
     const documentRequest = detectDocumentRequest(content)
     setInput("")
@@ -418,61 +553,58 @@ export function ChatPage() {
       id: `typing-${Date.now()}`,
       role: "assistant",
       content: "",
-      timestamp: "",
+      timestamp: formatTime(),
       isTyping: true,
+      isStreaming: true,
     }
     setMessages((current) => [...current, userMessage, typingMessage])
 
+    let conversationId: string | null = null
     try {
-      const conversationId = await ensureConversation()
+      conversationId = await ensureConversation()
+      const seededMessages = [...messages, userMessage, typingMessage]
+      conversationCacheRef.current.set(conversationId, seededMessages)
       const fileIds = attachedFiles.map((file) => file.id)
+      const controller = new AbortController()
+      streamAbortRef.current = controller
+      const streamSessionId = ++streamSessionRef.current
       let response: CeaserChatResponse | null = null
       try {
         let streamedContent = ""
         let streamError: string | null = null
         await chatApi.sendCeaserMessageStream(content, conversationId, fileIds, {
           onToken: (text) => {
+            if (streamSessionRef.current !== streamSessionId) return
             streamedContent += text
             setMessages((current) =>
               current.map((message) =>
                 message.id === typingMessage.id
-                  ? { ...message, content: streamedContent, timestamp: formatTime(), isTyping: false }
+                  ? { ...message, content: streamedContent, timestamp: formatTime(), isTyping: false, isStreaming: true }
                   : message,
               ),
             )
           },
           onComplete: (streamedResponse) => {
+            if (streamSessionRef.current !== streamSessionId) return
             response = streamedResponse
           },
           onError: (message) => {
+            if (streamSessionRef.current !== streamSessionId) return
             streamError = message
           },
-        })
+        }, { signal: controller.signal })
         if (streamError) throw new Error(streamError)
-      } catch {
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return
         response = await chatApi.sendCeaserMessage(content, conversationId, fileIds)
       }
       if (!response) throw new Error("We couldn't complete your request. Please try again.")
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: response.response,
-        timestamp: formatTime(),
-        agentIds: response.selected_agents.map(agentNameToId),
-        memoriesUsed: response.memories_used,
-        contributions: response.contributions,
-        contributionSummary: response.contribution_summary,
-        research: response.research,
-        workflow: response.workflow,
-        highlights: [
-          `Scope: ${response.scope}`,
-          `Selected Agents: ${response.selected_agents.join(", ") || "None"}`,
-          response.workflow ? `Workflow: ${response.workflow.type}` : null,
-          `Memories Used: ${response.memories_used.length}`,
-          `Sources: ${response.research?.sources.length ?? 0}`,
-        ].filter(Boolean) as string[],
-      }
-      setMessages((current) => current.filter((message) => !message.isTyping).concat(assistantMessage))
+      const assistantMessage = responseToMessage(typingMessage.id, response)
+      setMessages((current) => {
+        const next = current.map((message) => (message.id === typingMessage.id ? { ...assistantMessage, isTyping: false, isStreaming: false } : message))
+        if (conversationId) conversationCacheRef.current.set(conversationId, next)
+        return next
+      })
       if (documentRequest) {
         const generated = await documentsApi.create({
           kind: documentRequest.kind,
@@ -490,27 +622,39 @@ export function ChatPage() {
           role: "assistant",
           content: generatedRecord.content,
           timestamp: formatTime(generatedRecord.created_at),
+          metadata: metadataFromRecord(generatedRecord),
           ...richMessageFields(generatedRecord),
         }
-        setMessages((current) => current.concat(generatedMessage))
+        setMessages((current) => {
+          const next = current.concat(generatedMessage)
+          if (conversationId) conversationCacheRef.current.set(conversationId, next)
+          return next
+        })
       }
       setAttachedFiles([])
-      await refreshConversationList()
+      void refreshConversationList()
       window.dispatchEvent(new Event("ceaser:activity-updated"))
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return
       const assistantMessage: Message = {
-        id: `error-${Date.now()}`,
+        id: typingMessage.id,
         role: "assistant",
         content: error instanceof Error ? error.message : "CEASER chat failed to connect.",
         timestamp: formatTime(),
       }
-      setMessages((current) => current.filter((message) => !message.isTyping).concat(assistantMessage))
+      setMessages((current) => {
+        const next = current.map((message) => (message.id === typingMessage.id ? assistantMessage : message))
+        if (conversationId) conversationCacheRef.current.set(conversationId, next)
+        return next
+      })
     } finally {
+      streamAbortRef.current = null
       setIsLoading(false)
     }
   }
 
   const handleVoiceResponse = async (response: VoiceRespondResponse) => {
+    const normalizedChat = normalizeChatResponse(response.chat as CeaserChatResponse)
     if (response.chat.conversation_id) {
       setActiveConversationId(response.chat.conversation_id)
       window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, response.chat.conversation_id)
@@ -524,23 +668,40 @@ export function ChatPage() {
     const assistantMessage: Message = {
       id: `voice-assistant-${Date.now()}`,
       role: "assistant",
-      content: response.chat.response,
+      content: normalizedChat.response,
       timestamp: formatTime(),
-      agentIds: response.chat.selected_agents.map(agentNameToId),
-      memoriesUsed: response.chat.memories_used,
-      contributions: response.chat.contributions,
-      contributionSummary: response.chat.contribution_summary,
-      research: response.chat.research,
-      workflow: response.chat.workflow,
-      highlights: [
-        `Scope: ${response.chat.scope}`,
-        `Selected Agents: ${response.chat.selected_agents.join(", ") || "None"}`,
-        response.chat.workflow ? `Workflow: ${response.chat.workflow.type}` : null,
-        `Memories Used: ${response.chat.memories_used.length}`,
-        `Sources: ${response.chat.research?.sources.length ?? 0}`,
-      ].filter(Boolean) as string[],
+      metadata: {
+        scope: normalizedChat.scope,
+        selected_agents: normalizedChat.selected_agents,
+        contributions: normalizedChat.contributions,
+        contribution_summary: normalizedChat.contribution_summary,
+        memories_used: normalizedChat.memories_used,
+        research: normalizedChat.research,
+        workflow: normalizedChat.workflow,
+        context_summary: normalizedChat.context_summary,
+        suggestions: normalizedChat.suggestions,
+      },
+      agentIds: normalizedChat.selected_agents.map(agentNameToId),
+      memoriesUsed: normalizedChat.memories_used,
+      contributions: normalizedChat.contributions,
+      contributionSummary: normalizedChat.contribution_summary,
+      research: normalizedChat.research,
+      workflow: normalizedChat.workflow,
+      highlights: buildHighlights({
+        scope: normalizedChat.scope,
+        selected_agents: normalizedChat.selected_agents,
+        memories_used: normalizedChat.memories_used,
+        research: normalizedChat.research,
+        workflow: normalizedChat.workflow,
+      }),
     }
-    setMessages((current) => [...current, userMessage, assistantMessage])
+    setMessages((current) => {
+      const next = [...current, userMessage, assistantMessage]
+      if (response.chat.conversation_id) {
+        conversationCacheRef.current.set(response.chat.conversation_id, next)
+      }
+      return next
+    })
     await refreshConversationList()
     window.dispatchEvent(new Event("ceaser:activity-updated"))
   }
@@ -746,7 +907,7 @@ export function ChatPage() {
                 {loadError}
               </div>
             )}
-            {!messages.length && !isBooting ? (
+            {!messages.length && !isBooting && !isConversationLoading ? (
               <>
                 <h1 className="text-left text-[38px] font-light leading-[1.08] tracking-[-0.03em] text-white md:text-[44px]">
                   Hey! Akshay
@@ -778,13 +939,20 @@ export function ChatPage() {
               </>
             ) : (
               <div className="mx-auto w-full max-w-[1180px] space-y-7">
-                {isBooting ? (
+                {isBooting || isConversationLoading ? (
                   <div className="flex items-center justify-center gap-2 py-12 text-sm text-white/55">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading conversation...
+                    {isBooting ? "Loading conversation..." : "Opening chat..."}
                   </div>
                 ) : (
-                  messages.map((message) => <ChatBubble key={message.id} message={message} />)
+                  messages.map((message, index) => (
+                    <ChatBubble
+                      key={message.id}
+                      message={message}
+                      previousUserPrompt={findPreviousUserPrompt(messages, index)}
+                      onPromptSelect={queueFollowUp}
+                    />
+                  ))
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -863,7 +1031,22 @@ function PromptCard({ title, text, color, onClick }: { title: string; text: stri
   )
 }
 
-function ChatBubble({ message }: { message: Message }) {
+function findPreviousUserPrompt(messages: Message[], assistantIndex: number) {
+  for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return messages[index].content
+  }
+  return ""
+}
+
+function ChatBubble({
+  message,
+  previousUserPrompt,
+  onPromptSelect,
+}: {
+  message: Message
+  previousUserPrompt?: string
+  onPromptSelect: (prompt: string) => void
+}) {
   return (
     <div className={cn("flex w-full gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
       {message.role === "assistant" && (
@@ -882,8 +1065,10 @@ function ChatBubble({ message }: { message: Message }) {
           </div>
         ) : (
           <>
-            <MarkdownMessage content={message.content} isUser={message.role === "user"} />
-            {message.role === "assistant" && <ResponseActions message={message} />}
+            <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />
+            {message.role === "assistant" && !message.isStreaming && (
+              <ResponseActions message={message} previousUserPrompt={previousUserPrompt} onPromptSelect={onPromptSelect} />
+            )}
             <p className={cn("mt-2 text-xs", message.role === "user" ? "text-white/60" : "text-white/38")}>{message.timestamp}</p>
           </>
         )}
@@ -929,12 +1114,29 @@ type ResponseAction = {
   run: () => void | Promise<void>
 }
 
-function ResponseActions({ message }: { message: Message }) {
+function ResponseActions({
+  message,
+  previousUserPrompt,
+  onPromptSelect,
+}: {
+  message: Message
+  previousUserPrompt?: string
+  onPromptSelect: (prompt: string) => void
+}) {
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null)
   const [saved, setSaved] = useState(false)
   const content = message.content.trim()
+  const hasBackendSuggestions = safeArray(message.metadata?.suggestions).length > 0
   const contextualActions = useMemo(() => getContextualActions(content), [content])
+  const proactiveSuggestions = useMemo(() => {
+    const backendSuggestions = safeArray(message.metadata?.suggestions)
+      .map((item) => (typeof item === "string" ? item : item?.text))
+      .filter((item): item is string => Boolean(item))
+    if (backendSuggestions.length) return backendSuggestions.slice(0, 5)
+    if (message.isStreaming) return []
+    return getProactiveSuggestions(previousUserPrompt ?? "", content)
+  }, [message.metadata?.suggestions, previousUserPrompt, content, message.isStreaming])
 
   useEffect(() => {
     try {
@@ -999,24 +1201,42 @@ function ResponseActions({ message }: { message: Message }) {
   ]
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
-      {actions.map((action) => {
-        const Icon = action.icon
-        const active = (action.id === "like" && feedback === "like") || (action.id === "dislike" && feedback === "dislike") || (action.id === "save" && saved)
-        return (
-          <button
-            key={action.id}
-            onClick={() => void action.run()}
-            className={cn(
-              "inline-flex h-8 items-center gap-2 rounded-full bg-white/[0.045] px-3 text-xs text-white/58 transition hover:bg-white/[0.08] hover:text-white",
-              active && "bg-cyan-400/12 text-cyan-200",
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {action.label}
-          </button>
-        )
-      })}
+    <div className="mt-4 space-y-3">
+      {proactiveSuggestions.length && (hasBackendSuggestions || !message.isStreaming) ? (
+        <div>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Next suggestions</p>
+          <div className="flex flex-wrap gap-2">
+            {proactiveSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => onPromptSelect(suggestion)}
+                className="inline-flex min-h-8 items-center rounded-full border border-cyan-300/15 bg-cyan-300/8 px-3 py-1.5 text-xs text-cyan-100 transition hover:bg-cyan-300/14"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {actions.map((action) => {
+          const Icon = action.icon
+          const active = (action.id === "like" && feedback === "like") || (action.id === "dislike" && feedback === "dislike") || (action.id === "save" && saved)
+          return (
+            <button
+              key={action.id}
+              onClick={() => void action.run()}
+              className={cn(
+                "inline-flex h-8 items-center gap-2 rounded-full bg-white/[0.045] px-3 text-xs text-white/58 transition hover:bg-white/[0.08] hover:text-white",
+                active && "bg-cyan-400/12 text-cyan-200",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {action.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1035,6 +1255,78 @@ function getContextualActions(content: string): Array<Omit<ResponseAction, "run"
     add("gmail", "Open in Gmail", Mail)
   }
   return actions.slice(0, 4)
+}
+
+function getProactiveSuggestions(prompt: string, content: string) {
+  const promptLower = prompt.toLowerCase()
+  const contentLower = content.toLowerCase()
+  const combined = `${promptLower}\n${contentLower}`
+
+  if (/(email|subject:|dear |regards|cover letter|application|mail)/i.test(combined)) {
+    return [
+      "Make this email shorter and sharper.",
+      "Rewrite this in a more professional tone.",
+      "Turn this into a follow-up email.",
+    ]
+  }
+
+  if (/(study|timetable|time table|schedule|revision|exam|flashcard|mcq|notes|learning)/i.test(combined)) {
+    return [
+      "Turn this into a simple study checklist.",
+      "Make this into a day-wise timetable.",
+      "Create revision questions from this.",
+    ]
+  }
+
+  if (/(research|analysis|market|competitor|report|sources|citation|latest|compare)/i.test(combined)) {
+    return [
+      "Summarize the main takeaways in simple language.",
+      "What should I do next based on this?",
+      "Turn this into an action plan.",
+    ]
+  }
+
+  if (/(plan|roadmap|strategy|workflow|project|execution|milestone)/i.test(combined)) {
+    return [
+      "Break this into weekly milestones.",
+      "Turn this into a step-by-step execution checklist.",
+      "What are the biggest risks in this plan?",
+    ]
+  }
+
+  if (/(mahabharata|krishna|gita|ramayana|mythology|epic|vyuha|kurukshetra|ravana|ravanasura|lanka)/i.test(combined)) {
+    return [
+      "Explain Ravana's character.",
+      "Compare Rama and Ravana.",
+      "Give the life lessons here.",
+    ]
+  }
+
+  if (/(resume|cv|interview|job|career|application role)/i.test(combined)) {
+    return [
+      "Make this more recruiter-friendly.",
+      "Turn this into an interview prep checklist.",
+      "Highlight the strongest points only.",
+    ]
+  }
+
+  if (/(document|pdf|report|summary|summarize|explain this file)/i.test(combined)) {
+    return [
+      "Give me the key points only.",
+      "Make this easier for a beginner.",
+      "Turn this into action items.",
+    ]
+  }
+
+  if (combined.trim().length > 0) {
+    return [
+      "Explain this more simply.",
+      "Give me a practical example.",
+      "What should I do next?",
+    ]
+  }
+
+  return []
 }
 
 function runContextAction(id: string, content: string) {
@@ -1073,8 +1365,15 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 50) || "ceaser-response"
 }
 
-function MarkdownMessage({ content, isUser }: { content: string; isUser: boolean }) {
-  if (isUser) return <p className="whitespace-pre-wrap text-sm">{content}</p>
+function MarkdownMessage({ content, isUser, isStreaming }: { content: string; isUser: boolean; isStreaming?: boolean }) {
+  if (isUser) return <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+  if (isStreaming) {
+    return (
+      <div className="space-y-1">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{content}</p>
+      </div>
+    )
+  }
   const structured = parseAnswerSections(content)
   if (structured) return <StructuredAnswer data={structured} />
 

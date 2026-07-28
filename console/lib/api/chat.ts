@@ -39,6 +39,7 @@ export interface CeaserChatResponse {
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
   context_summary: Record<string, unknown>
+  suggestions?: SuggestionItem[]
   response: string
 }
 
@@ -51,6 +52,14 @@ export interface MessageMetadata {
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
   context_summary?: Record<string, unknown>
+  suggestions?: SuggestionItem[]
+}
+
+export interface SuggestionItem {
+  text: string
+  action_type: string
+  category: string
+  confidence: number
 }
 
 export interface WorkflowResult {
@@ -103,7 +112,7 @@ export const chatApi = {
     const params = new URLSearchParams()
     if (archived) params.set("archived", "true")
     const query = params.toString() ? `?${params.toString()}` : ""
-    return apiRequest<ConversationRecord[]>(`/conversations${query}`, { cacheTtlMs: 300000 })
+    return apiRequest<ConversationRecord[]>(`/conversations${query}`)
   },
   createConversation: (title?: string) =>
     apiRequest<ConversationRecord>("/conversations", {
@@ -119,8 +128,8 @@ export const chatApi = {
     apiRequest<void>(`/conversations/${conversationId}`, {
       method: "DELETE",
     }),
-  listMessages: (conversationId: string) =>
-    apiRequest<ChatMessage[]>(`/chat/conversations/${conversationId}/messages`, { cacheTtlMs: 300000 }),
+  listMessages: (conversationId: string, limit = 60) =>
+    apiRequest<ChatMessage[]>(`/chat/conversations/${conversationId}/messages?limit=${limit}`),
   sendMessage: (conversationId: string, content: string, role: "user" | "assistant" | "system" = "user", metadata: Record<string, unknown> = {}) =>
     apiRequest<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
       method: "POST",
@@ -144,11 +153,13 @@ export const chatApi = {
       onComplete?: (response: CeaserChatResponse) => void
       onError?: (message: string) => void
     },
+    options?: { signal?: AbortSignal },
   ) =>
     apiStreamRequest(
       "/ceaser/chat/stream",
       {
         method: "POST",
+        signal: options?.signal,
         body: {
           message,
           conversation_id: conversationId,
@@ -157,7 +168,7 @@ export const chatApi = {
       },
       {
         onToken: handlers.onToken,
-        onComplete: (payload) => handlers.onComplete?.((payload.response ?? payload) as CeaserChatResponse),
+        onComplete: (payload) => handlers.onComplete?.(payload as unknown as CeaserChatResponse),
         onError: handlers.onError,
       },
     ),

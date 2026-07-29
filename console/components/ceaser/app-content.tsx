@@ -6,7 +6,6 @@ import { MissionControl } from "./pages/mission-control"
 import { ChatPage } from "./pages/chat-page"
 import { StudentPage } from "./pages/student-page"
 import { AgentsPage } from "./pages/agents-page"
-import { DraftsPage } from "./pages/drafts-page"
 import { MemoryPage } from "./pages/memory-page"
 import { ProjectsPage } from "./pages/projects-page"
 import { GoalsPage } from "./pages/goals-page"
@@ -30,8 +29,6 @@ export function AppContent() {
       return <StudentPage />
     case "agents":
       return <AgentsPage />
-    case "drafts":
-      return <DraftsPage />
     case "memory":
       return <MemoryPage />
     case "projects":

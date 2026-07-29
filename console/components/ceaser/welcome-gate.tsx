@@ -7,7 +7,8 @@ import { CeaserSelect } from "./ceaser-select"
 import { CeaserLogo } from "./ceaser-logo"
 import { SystemStatusCard } from "./system-status-card"
 import { cn } from "@/lib/utils"
-import { ArrowRight, CheckCircle2, Loader2, Mic, MonitorCog, ShieldCheck, Sparkles, UserRound, Wand2 } from "lucide-react"
+import { useApp } from "@/lib/app-context"
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mic, MonitorCog, ShieldCheck, Sparkles, UserRound, Wand2 } from "lucide-react"
 
 const ONBOARDING_KEY = "ceaser_onboarding_complete"
 const PROFILE_KEY = "ceaser_user_profile"
@@ -18,6 +19,7 @@ type AuthMode = "login" | "signup"
 const useCases = ["Student", "Professional", "Founder", "Creator", "Developer"]
 
 export function WelcomeGate({ children }: { children: ReactNode }) {
+  const { setCurrentPage } = useApp()
   const [isChecking, setIsChecking] = useState(true)
   const [session, setSession] = useState<AuthSession | null>(null)
   const [onboardingComplete, setOnboardingComplete] = useState(false)
@@ -25,6 +27,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [name, setName] = useState("")
   const [useCase, setUseCase] = useState("Founder")
   const [studentProfile, setStudentProfile] = useState({
@@ -163,6 +166,12 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       setSession(next)
       const signedInEmail = sessionEmail(next) || email.trim()
       setEmail(signedInEmail)
+      if (authMode === "login") {
+        setCurrentPage("mission-control")
+        window.localStorage.setItem(ONBOARDING_KEY, "true")
+        setOnboardingComplete(true)
+        return
+      }
       const completed = hasCompletedOnboarding(signedInEmail)
       if (completed) window.localStorage.setItem(ONBOARDING_KEY, "true")
       setOnboardingComplete(completed)
@@ -289,7 +298,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
               <StepPanel eyebrow="Account" title={authMode === "login" ? "Sign in to CEASER" : "Create your CEASER account"} text="Use the same account across the web app and desktop companion.">
                 <div className="grid gap-3">
                   <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" className="h-12 rounded-2xl border border-white/10 bg-white/5 px-4 outline-none ring-primary/30 focus:ring-2" />
-                  <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" className="h-12 rounded-2xl border border-white/10 bg-white/5 px-4 outline-none ring-primary/30 focus:ring-2" />
+                  <div className="relative"><input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type={passwordVisible ? "text" : "password"} className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 pr-12 outline-none ring-primary/30 focus:ring-2" /><button type="button" onClick={() => setPasswordVisible((visible) => !visible)} aria-label={passwordVisible ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 px-4 text-muted-foreground hover:text-foreground">{passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
                   {message && <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{message}</p>}
                   <PrimaryButton onClick={() => void submitAuth()} disabled={!email || !password || authBusy}>
                     {authBusy ? "Checking..." : authMode === "login" ? "Sign in" : "Create account"}
@@ -311,9 +320,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                       <span>Continue with Google</span>
                     )}
                   </button>
-                  <button type="button" onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")} className="text-sm text-muted-foreground transition hover:text-primary">
-                    {authMode === "login" ? "Need an account? Create one" : "Already have an account? Sign in"}
-                  </button>
+                  <div className="flex items-center justify-between"><BackButton onClick={() => setStep("welcome")} /><button type="button" onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")} className="text-sm text-muted-foreground transition hover:text-primary">{authMode === "login" ? "Need an account? Create one" : "Already have an account? Sign in"}</button></div>
                   <div className="flex flex-wrap justify-center gap-3 text-xs">
                     <button type="button" onClick={() => void sendRecoveryEmail()} disabled={recoveryBusy} className="text-muted-foreground transition hover:text-primary disabled:opacity-50">
                       {recoveryBusy ? "Sending reset..." : "Forgot password?"}
@@ -345,7 +352,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                     <StudentInput label="Graduation year" value={studentProfile.graduationYear} onChange={(value) => setStudentProfile((current) => ({ ...current, graduationYear: value }))} />
                   </div>
                 )}
-                <PrimaryButton onClick={saveProfile}>Continue</PrimaryButton>
+                <div className="flex items-center gap-3"><BackButton onClick={() => setStep("auth")} /><PrimaryButton onClick={saveProfile}>Continue</PrimaryButton></div>
               </StepPanel>
             )}
 
@@ -355,7 +362,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                   <PermissionCard icon={Mic} title="Microphone" status={micStatus === "ready" ? "Ready" : micStatus === "blocked" ? "Needs browser permission" : "Not checked"} action={requestMicrophone} />
                   <PermissionCard icon={ShieldCheck} title="Desktop control" status="Safe actions only in V1" />
                 </div>
-                <PrimaryButton onClick={() => setStep("hotkey")}>Continue</PrimaryButton>
+                <div className="flex items-center gap-3"><BackButton onClick={() => setStep("profile")} /><PrimaryButton onClick={() => setStep("hotkey")}>Continue</PrimaryButton></div>
               </StepPanel>
             )}
 
@@ -368,7 +375,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                     {hotkeyStatus === "detected" ? "Hold key detected. Hold it, speak, then release to run the command." : "Hold Right Ctrl while speaking. Release it when you are done."}
                   </p>
                 </div>
-                <PrimaryButton onClick={() => setStep("voice")}>Continue</PrimaryButton>
+                <div className="flex items-center gap-3"><BackButton onClick={() => setStep("permissions")} /><PrimaryButton onClick={() => setStep("voice")}>Continue</PrimaryButton></div>
               </StepPanel>
             )}
 
@@ -384,7 +391,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                   }
                   triggerClassName="h-12 rounded-2xl"
                 />
-                <PrimaryButton onClick={finishOnboarding}>Finish setup</PrimaryButton>
+                <div className="flex items-center gap-3"><BackButton onClick={() => setStep("hotkey")} /><PrimaryButton onClick={finishOnboarding}>Finish setup</PrimaryButton></div>
               </StepPanel>
             )}
 
@@ -395,7 +402,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
                     <div key={item} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-muted-foreground">{item}</div>
                   ))}
                 </div>
-                <PrimaryButton onClick={openCeaser}>Open CEASER</PrimaryButton>
+                <div className="flex items-center gap-3"><BackButton onClick={() => setStep("voice")} /><PrimaryButton onClick={openCeaser}>Open CEASER</PrimaryButton></div>
               </StepPanel>
             )}
           </section>
@@ -449,6 +456,10 @@ function PrimaryButton({ children, onClick, disabled }: { children: ReactNode; o
       <ArrowRight className="h-4 w-4" />
     </button>
   )
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-muted-foreground transition hover:bg-white/10 hover:text-foreground"><ArrowLeft className="h-4 w-4" />Previous</button>
 }
 
 function MiniFeature({ icon: Icon, title, text }: { icon: typeof Mic; title: string; text: string }) {

@@ -6,6 +6,7 @@ import { draftsApi, type DraftRecord } from "@/lib/api/drafts"
 import { documentsApi, type GeneratedDocument } from "@/lib/api/documents"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
+import { workflowsApi, type WorkflowRunRecord } from "@/lib/api/workflows"
 import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { AgentAvatar } from "../agent-avatar"
@@ -71,6 +72,7 @@ export function ProjectsPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [drafts, setDrafts] = useState<DraftRecord[]>([])
   const [generatedDocuments, setGeneratedDocuments] = useState<GeneratedDocument[]>([])
+  const [workflows, setWorkflows] = useState<WorkflowRunRecord[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [focusedProjectId, setFocusedProjectId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ProjectTab>("all")
@@ -83,6 +85,8 @@ export function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [newProject, setNewProject] = useState({ name: "", description: "", status: "planned" as ProjectStatus })
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false)
+  const [workflowForm, setWorkflowForm] = useState({ goal: "", phases: "", owners: "", dependencies: "", deadlines: "", risks: "", successChecks: "" })
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
 
@@ -102,11 +106,12 @@ export function ProjectsPage() {
   async function loadProjects() {
     setIsLoading(true)
     try {
-      const [projectResult, fileResult, draftResult, documentResult] = await Promise.allSettled([
+      const [projectResult, fileResult, draftResult, documentResult, workflowResult] = await Promise.allSettled([
         projectsApi.list(),
         filesApi.list(),
         draftsApi.list(),
         documentsApi.list(),
+        workflowsApi.list(),
       ])
       if (projectResult.status === "fulfilled") {
         setProjects(projectResult.value)
@@ -115,6 +120,7 @@ export function ProjectsPage() {
       if (fileResult.status === "fulfilled") setFiles(fileResult.value)
       if (draftResult.status === "fulfilled") setDrafts(draftResult.value)
       if (documentResult.status === "fulfilled") setGeneratedDocuments(documentResult.value)
+      if (workflowResult.status === "fulfilled") setWorkflows(workflowResult.value)
     } finally {
       setIsLoading(false)
     }
@@ -160,6 +166,10 @@ export function ProjectsPage() {
     if (!selectedProject) return []
     return documentsForProject(generatedDocuments, selectedProject, projects.length, workflowLinks)
   }, [generatedDocuments, projects.length, selectedProject, workflowLinks])
+  const projectWorkflows = useMemo(() => {
+    if (!selectedProject) return []
+    return workflows.filter((workflow) => workflowLinks[workflow.id] === selectedProject.id)
+  }, [selectedProject, workflowLinks, workflows])
 
   const linkedAgents = useMemo(() => {
     const text = `${selectedProject?.name ?? ""} ${selectedProject?.description ?? ""}`.toLowerCase()
@@ -197,6 +207,28 @@ export function ProjectsPage() {
     setDetailTab("overview")
     setNewProject({ name: "", description: "", status: "planned" })
     setIsAddModalOpen(false)
+  }
+
+  function generateWorkflowFromForm() {
+    if (!selectedProject || !workflowForm.goal.trim()) return
+    const sections = [
+      `Create a workflow document for ${selectedProject.name}.`,
+      `Project context: ${selectedProject.description || "No description added."}`,
+      `Goal: ${workflowForm.goal.trim()}`,
+      workflowForm.phases.trim() && `Requested phases: ${workflowForm.phases.trim()}`,
+      workflowForm.owners.trim() && `Owners or teams: ${workflowForm.owners.trim()}`,
+      workflowForm.dependencies.trim() && `Dependencies: ${workflowForm.dependencies.trim()}`,
+      workflowForm.deadlines.trim() && `Deadlines or timeline: ${workflowForm.deadlines.trim()}`,
+      workflowForm.risks.trim() && `Risks to address: ${workflowForm.risks.trim()}`,
+      workflowForm.successChecks.trim() && `Success checks: ${workflowForm.successChecks.trim()}`,
+      "Create a practical, detailed document with numbered phases, tasks, owners, dependencies, deadlines, risks, success checks, and measurable next actions.",
+    ].filter(Boolean)
+
+    window.localStorage.setItem("ceaser_chat_seed", sections.join("\n\n"))
+    window.localStorage.setItem("ceaser_chat_autosend", "true")
+    setIsWorkflowModalOpen(false)
+    setWorkflowForm({ goal: "", phases: "", owners: "", dependencies: "", deadlines: "", risks: "", successChecks: "" })
+    setCurrentPage("chat")
   }
 
   async function updateProject(projectId: string, updates: Partial<Pick<ProjectRecord, "name" | "description" | "status">>) {
@@ -326,7 +358,7 @@ export function ProjectsPage() {
                 }}
                 onFavorite={() => toggleFavorite(project.id)}
                 onRename={() => void renameProject(project)}
-                onArchive={() => void updateProject(project.id, { status: "archived" })}
+                onArchive={() => void updateProject(project.id, { status: project.status === "archived" ? "planned" : "archived" })}
                 onDelete={() => void deleteProject(project)}
               />
             ))}
@@ -349,6 +381,7 @@ export function ProjectsPage() {
         files={projectFiles}
         drafts={projectDrafts}
         generatedDocuments={projectGeneratedDocuments}
+        workflows={projectWorkflows}
         agents={linkedAgents}
         favorite={Boolean(selectedProject && favorites.includes(selectedProject.id))}
         detailTab={detailTab}
@@ -370,19 +403,8 @@ export function ProjectsPage() {
         }}
         onCreateWorkflow={async () => {
           if (!selectedProject) return
-          const created = await draftsApi.create({
-            prompt: `Create a practical workflow for ${selectedProject.name}. Context: ${selectedProject.description || "No description added."}`,
-            draft_type: "execution_plan",
-            agent_id: "bolt",
-            target_app: "keep_as_draft",
-            requested_units: 8,
-          })
-          const nextLinks = { ...workflowLinks, [created.id]: selectedProject.id }
-          setWorkflowLinks(nextLinks)
-          window.localStorage.setItem(PROJECT_WORKFLOW_LINKS_KEY, JSON.stringify(nextLinks))
-          setDrafts((current) => [created, ...current])
-          setDetailTab("tasks")
-          window.dispatchEvent(new CustomEvent("ceaser:activity-updated"))
+          setWorkflowForm({ goal: "", phases: "", owners: "", dependencies: "", deadlines: "", risks: "", successChecks: "" })
+          setIsWorkflowModalOpen(true)
         }}
         onContinueResearch={() => {
           if (selectedProject) {
@@ -407,6 +429,15 @@ export function ProjectsPage() {
           setProject={setNewProject}
           onClose={() => setIsAddModalOpen(false)}
           onCreate={() => void createProject()}
+        />
+      )}
+      {isWorkflowModalOpen && selectedProject && (
+        <WorkflowDetailsModal
+          project={selectedProject}
+          form={workflowForm}
+          setForm={setWorkflowForm}
+          onClose={() => setIsWorkflowModalOpen(false)}
+          onGenerate={generateWorkflowFromForm}
         />
       )}
     </div>
@@ -462,7 +493,7 @@ function ProjectCard({
             <p className="mt-1 text-xs capitalize text-muted-foreground">{statusCopy[project.status as ProjectStatus] ?? project.status}</p>
           </div>
         </div>
-        <ProjectMenu onFavorite={onFavorite} onRename={onRename} onArchive={onArchive} onDelete={onDelete} />
+        <ProjectMenu archived={project.status === "archived"} onFavorite={onFavorite} onRename={onRename} onArchive={onArchive} onDelete={onDelete} />
       </div>
 
       <div className={cn(compact ? "min-w-0 flex-1" : "mt-4")}>
@@ -500,6 +531,7 @@ function ProjectDetails({
   files,
   drafts,
   generatedDocuments,
+  workflows,
   agents: linkedAgents,
   favorite,
   detailTab,
@@ -521,6 +553,7 @@ function ProjectDetails({
   files: FileRecord[]
   drafts: DraftRecord[]
   generatedDocuments: GeneratedDocument[]
+  workflows: WorkflowRunRecord[]
   agents: typeof agents
   favorite: boolean
   detailTab: DetailTab
@@ -548,10 +581,12 @@ function ProjectDetails({
     )
   }
 
-  const nextStep = getSuggestedNextStep(project, files.length, drafts.length + generatedDocuments.length)
+  const workflowCount = drafts.length + generatedDocuments.length + workflows.length
+  const nextStep = getSuggestedNextStep(project, files.length, workflowCount)
   const activity = [
     ...generatedDocuments.slice(0, 3).map((document) => ({ title: `Document: ${document.file_name || document.template_id}`, detail: `${document.agent_id} / ${formatRelative(document.created_at)}` })),
     ...drafts.slice(0, 3).map((draft) => ({ title: `Workflow: ${draft.title}`, detail: `${draft.agent_id} / ${formatRelative(draft.created_at)}` })),
+    ...workflows.slice(0, 3).map((workflow) => ({ title: `Generated workflow: ${workflow.workflow_type.replaceAll("_", " ")}`, detail: `${workflow.status} / ${formatRelative(workflow.created_at)}` })),
     ...files.slice(0, 3).map((file) => ({ title: `File: ${file.name}`, detail: `${file.file_type} / ${formatRelative(file.created_at)}` })),
   ]
 
@@ -595,7 +630,7 @@ function ProjectDetails({
         {[
           ["overview", "Overview"],
           ["files", `Files (${files.length})`],
-          ["tasks", `Workflows (${drafts.length + generatedDocuments.length})`],
+          ["tasks", `Workflows (${workflowCount})`],
           ["activity", "Activity"],
         ].map(([id, label]) => (
           <button key={id} onClick={() => setDetailTab(id as DetailTab)} className={cn("border-b-2 px-3 py-4 text-sm transition", detailTab === id ? "border-violet-400 text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
@@ -627,7 +662,7 @@ function ProjectDetails({
             <Panel>
               <p className="mb-4 font-semibold">Project Knowledge</p>
               <InfoRow label="Files" value={String(files.length)} />
-              <InfoRow label="Workflows" value={String(drafts.length + generatedDocuments.length)} />
+              <InfoRow label="Workflows" value={String(workflowCount)} />
               <InfoRow label="Generated Docs" value={String(generatedDocuments.length)} />
               <InfoRow label="Reports" value={String(drafts.filter((draft) => draft.draft_type === "research").length)} />
               <InfoRow label="Agents" value={String(linkedAgents.length)} />
@@ -701,6 +736,11 @@ function ProjectDetails({
             <p className="mb-4 font-semibold">Project Workflows</p>
             <List
               items={[
+                ...workflows.map((workflow) => ({
+                  title: `Generated ${workflow.workflow_type.replaceAll("_", " ")} workflow`,
+                  detail: `${workflow.status} — ${String(workflow.metadata_json.generated_response || workflow.result_summary || "Workflow generated and ready to review.").slice(0, 360)}`,
+                  icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" />,
+                })),
                 ...drafts.map((draft) => ({ title: draft.title, detail: `${draft.draft_type} / ${draft.status} / ${draft.progress}%`, icon: <BarChart3 className="h-4 w-4" /> })),
                 ...generatedDocuments.map((document) => ({ title: document.file_name || document.template_id, detail: `${document.export_format.toUpperCase()} / ${document.agent_id} / ${formatRelative(document.created_at)}`, icon: <FileText className="h-4 w-4" /> })),
               ]}
@@ -717,6 +757,53 @@ function ProjectDetails({
         )}
       </div>
     </aside>
+  )
+}
+
+type WorkflowForm = { goal: string; phases: string; owners: string; dependencies: string; deadlines: string; risks: string; successChecks: string }
+
+function WorkflowDetailsModal({ project, form, setForm, onClose, onGenerate }: { project: ProjectRecord; form: WorkflowForm; setForm: (form: WorkflowForm) => void; onClose: () => void; onGenerate: () => void }) {
+  const fields: Array<{ key: keyof WorkflowForm; label: string; placeholder: string; required?: boolean }> = [
+    { key: "goal", label: "Workflow goal", placeholder: "What outcome should this workflow achieve?", required: true },
+    { key: "phases", label: "Phases", placeholder: "For example: discovery, build, launch" },
+    { key: "owners", label: "Owners or teams", placeholder: "For example: product lead, engineering, compliance" },
+    { key: "dependencies", label: "Dependencies", placeholder: "What must happen first?" },
+    { key: "deadlines", label: "Deadlines or timeline", placeholder: "For example: MVP in 8 weeks" },
+    { key: "risks", label: "Risks to address", placeholder: "For example: privacy, budget, integration delays" },
+    { key: "successChecks", label: "Success checks", placeholder: "How will the team know this succeeded?" },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <section className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-border bg-card p-5 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Create workflow</p>
+            <h2 className="mt-1 text-xl font-semibold">{project.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Add the details one by one. CEASER will turn them into a structured workflow document and save it in Files.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {fields.map((field) => (
+            <label key={field.key} className={cn("space-y-1.5", field.key === "goal" || field.key === "successChecks" ? "sm:col-span-2" : "")}>
+              <span className="text-sm font-medium">{field.label}{field.required ? <span className="text-primary"> *</span> : null}</span>
+              <textarea
+                value={form[field.key]}
+                onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
+                placeholder={field.placeholder}
+                rows={field.key === "goal" || field.key === "successChecks" ? 3 : 2}
+                className="w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm">Cancel</button>
+          <button type="button" onClick={onGenerate} disabled={!form.goal.trim()} className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Generate Workflow</button>
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -752,7 +839,7 @@ function CreateProjectModal({ project, setProject, onClose, onCreate }: { projec
   )
 }
 
-function ProjectMenu({ onFavorite, onRename, onArchive, onDelete }: { onFavorite: () => void; onRename: () => void; onArchive: () => void; onDelete: () => void }) {
+function ProjectMenu({ archived, onFavorite, onRename, onArchive, onDelete }: { archived: boolean; onFavorite: () => void; onRename: () => void; onArchive: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
@@ -763,7 +850,7 @@ function ProjectMenu({ onFavorite, onRename, onArchive, onDelete }: { onFavorite
         <div className="absolute right-0 top-9 z-20 w-40 rounded-2xl border border-border bg-popover p-1 shadow-2xl">
           <MenuItem label="Favorite" onClick={onFavorite} />
           <MenuItem label="Rename" onClick={onRename} />
-          <MenuItem label="Archive" onClick={onArchive} />
+          <MenuItem label={archived ? "Unarchive" : "Archive"} onClick={onArchive} />
           <MenuItem label="Delete" danger onClick={onDelete} />
         </div>
       )}
@@ -819,8 +906,8 @@ function List({ items, empty }: { items: Array<{ title: string; detail: string; 
   if (!items.length) return <p className="rounded-xl border border-border bg-secondary/35 p-4 text-sm text-muted-foreground">{empty}</p>
   return (
     <div className="space-y-2">
-      {items.map((item) => (
-        <div key={`${item.title}-${item.detail}`} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/35 p-3">
+      {items.map((item, index) => (
+        <div key={`${item.title}-${item.detail}-${index}`} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/35 p-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300">{item.icon}</span>
           <span className="min-w-0 flex-1">
             <span className="line-clamp-1 text-sm font-medium">{item.title}</span>

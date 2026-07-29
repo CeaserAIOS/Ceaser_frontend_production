@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { apiRequest, invalidateApiCache } from "./client"
 
 export interface DraftSection {
   title: string
@@ -70,11 +70,20 @@ export const draftsApi = {
     return apiRequest<DraftRecord[]>(`/drafts${query.toString() ? `?${query}` : ""}`)
   },
   create: (payload: { prompt: string; draft_type?: string | null; agent_id?: string | null; target_app?: string; requested_units?: number }) =>
-    apiRequest<DraftRecord>("/drafts", { method: "POST", body: payload }),
+    apiRequest<DraftRecord>("/drafts", { method: "POST", body: payload }).then((response) => {
+      invalidateApiCache(["/drafts"])
+      return response
+    }),
   action: (draftId: string, action: "regenerated" | "approved" | "archived") =>
-    apiRequest<DraftRecord>(`/drafts/${draftId}/${action}`, { method: "POST" }),
+    apiRequest<DraftRecord>(`/drafts/${draftId}/${action}`, { method: "POST" }).then((response) => {
+      invalidateApiCache(["/drafts"])
+      return response
+    }),
   delete: (draftId: string) =>
-    apiRequest<{ status: string; id: string }>(`/drafts/${draftId}`, { method: "DELETE" }),
+    apiRequest<{ status: string; id: string }>(`/drafts/${draftId}`, { method: "DELETE" }).then((response) => {
+      invalidateApiCache(["/drafts"])
+      return response
+    }),
   agentWorkbench: (agentId: string) =>
     apiRequest<AgentWorkbenchRecord>(`/agent-workbenches/${agentId}`),
 }

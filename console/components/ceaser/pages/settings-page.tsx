@@ -43,6 +43,7 @@ import {
   GraduationCap,
   Upload,
   Loader2
+  ,Eye, EyeOff
 } from "lucide-react"
 
 declare global {
@@ -138,7 +139,13 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState("status")
   const [profile, setProfile] = useState<{ name?: string; email?: string; useCase?: string } | null>(null)
   const [profileDraft, setProfileDraft] = useState({ name: getUserDisplayName(readUserProfile(), user.name), email: "", useCase: user.role })
+  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
+  const [confirmNewPassword, setConfirmNewPassword] = useState("")
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [mfaModalOpen, setMfaModalOpen] = useState(false)
+  const [mfaSetupPassword, setMfaSetupPassword] = useState("")
+  const [mfaEnabled, setMfaEnabled] = useState(false)
   const [securityMessage, setSecurityMessage] = useState("")
   const [securityBusy, setSecurityBusy] = useState<string | null>(null)
   const [mfaEnrollment, setMfaEnrollment] = useState<Record<string, unknown> | null>(null)
@@ -597,16 +604,28 @@ export function SettingsPage() {
   }
 
   async function updatePassword() {
-    if (newPassword.length < 6) {
-      setSecurityMessage("Use at least 6 characters for the new password.")
+    const passwordIsValid = newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /\d/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword)
+    if (!currentPassword) {
+      setSecurityMessage("Enter your current password.")
+      return
+    }
+    if (!passwordIsValid) {
+      setSecurityMessage("Your new password does not meet the requirements.")
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setSecurityMessage("New passwords do not match.")
       return
     }
     setSecurityBusy("password")
     setSecurityMessage("")
     try {
-      await authApi.updatePassword(newPassword)
+      await authApi.updatePassword(currentPassword, newPassword)
+      setCurrentPassword("")
       setNewPassword("")
+      setConfirmNewPassword("")
       setSecurityMessage("Password updated.")
+      setPasswordModalOpen(false)
     } catch (error) {
       setSecurityMessage(error instanceof Error ? error.message : "Could not update password.")
     } finally {
@@ -615,9 +634,14 @@ export function SettingsPage() {
   }
 
   async function startMfaEnrollment() {
+    if (!mfaSetupPassword) {
+      setSecurityMessage("Enter your password to continue.")
+      return
+    }
     setSecurityBusy("mfa")
     setSecurityMessage("")
     try {
+      await authApi.verifyPassword(mfaSetupPassword)
       const result = await authApi.enrollMfa()
       setMfaEnrollment(result)
       setSecurityMessage("Scan the authenticator QR code, then enter the 6-digit code.")
@@ -643,6 +667,7 @@ export function SettingsPage() {
       setSecurityMessage("Two-factor authentication enabled.")
       setMfaEnrollment(null)
       setMfaCode("")
+      setMfaEnabled(true)
     } catch (error) {
       setSecurityMessage(error instanceof Error ? error.message : "Could not verify two-factor code.")
     } finally {
@@ -1383,18 +1408,7 @@ export function SettingsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    placeholder="New password"
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                  />
-                  <button onClick={() => void updatePassword()} disabled={securityBusy === "password"} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-                    {securityBusy === "password" ? "Saving" : "Update"}
-                  </button>
-                </div>
+                <button onClick={() => setPasswordModalOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Update Password</button>
                 <div className="border-t border-border pt-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -1404,30 +1418,10 @@ export function SettingsPage() {
                         <p className="text-sm text-muted-foreground">Use an authenticator app with a 6-digit code</p>
                       </div>
                     </div>
-                    <button onClick={() => void startMfaEnrollment()} disabled={securityBusy === "mfa"} className="rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-secondary disabled:opacity-50">
-                      {securityBusy === "mfa" ? "Starting" : "Set up"}
+                    <button onClick={() => setMfaModalOpen(true)} className="rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-secondary">
+                      {mfaEnabled ? "Manage 2FA" : "Enable 2FA"}
                     </button>
                   </div>
-                  {mfaEnrollment && (
-                    <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/10 p-4">
-                      {getMfaQr(mfaEnrollment) ? (
-                        <img src={getMfaQr(mfaEnrollment)} alt="Authenticator QR code" className="h-40 w-40 rounded-xl bg-white p-2" />
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Secret: {getMfaSecret(mfaEnrollment) || "Open your authenticator app and use the setup details returned by Supabase."}</p>
-                      )}
-                      <div className="flex gap-2">
-                        <input
-                          value={mfaCode}
-                          onChange={(event) => setMfaCode(event.target.value)}
-                          placeholder="6-digit code"
-                          className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                        />
-                        <button onClick={() => void verifyMfaEnrollment()} disabled={securityBusy === "mfa-verify"} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-                          {securityBusy === "mfa-verify" ? "Verifying" : "Verify"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1451,6 +1445,30 @@ export function SettingsPage() {
                 </div>
               </div>
             </GlowCard>
+          </div>
+        )}
+
+        {passwordModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setPasswordModalOpen(false)}>
+            <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-5 flex items-start justify-between gap-4"><div><h3 className="text-xl font-semibold">Change Password</h3><p className="mt-1 text-sm text-muted-foreground">Confirm your current password, then choose a strong new one.</p></div><button onClick={() => setPasswordModalOpen(false)} className="text-muted-foreground hover:text-foreground">Close</button></div>
+              <div className="space-y-4">
+                <PasswordField id="modal-current-password" label="Current Password" value={currentPassword} onChange={setCurrentPassword} placeholder="Enter your current password" autoComplete="current-password" />
+                <div><PasswordField id="modal-new-password" label="New Password" value={newPassword} onChange={setNewPassword} placeholder="Enter your new password" autoComplete="new-password" /><PasswordRequirements password={newPassword} /></div>
+                <PasswordField id="modal-confirm-password" label="Confirm New Password" value={confirmNewPassword} onChange={setConfirmNewPassword} placeholder="Re-enter your new password" autoComplete="new-password" />
+                {securityMessage && <p className="text-sm text-muted-foreground">{securityMessage}</p>}
+                <button onClick={() => void updatePassword()} disabled={securityBusy === "password"} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{securityBusy === "password" ? "Updating..." : "Update Password"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mfaModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={() => setMfaModalOpen(false)}>
+            <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-5 flex items-start justify-between"><div><h3 className="text-xl font-semibold">Two-Factor Authentication</h3><p className="mt-1 text-sm text-muted-foreground">Add an extra layer of security to your CEASER account.</p></div><button onClick={() => setMfaModalOpen(false)} className="text-muted-foreground hover:text-foreground">Close</button></div>
+              {mfaEnabled ? <div className="space-y-4"><p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">2FA Enabled ✓ Your CEASER account is protected with two-factor authentication.</p><button className="rounded-lg border border-border px-4 py-2 text-sm">Manage 2FA</button><button className="ml-2 rounded-lg border border-red-500/30 px-4 py-2 text-sm text-red-400">Disable 2FA</button></div> : !mfaEnrollment ? <div className="space-y-4"><p className="text-sm">Status: <span className="text-muted-foreground">○ Not enabled</span></p><div><label className="mb-2 block text-sm font-medium">Step 1 — Verify password</label><input type="password" value={mfaSetupPassword} onChange={(event) => setMfaSetupPassword(event.target.value)} placeholder="Enter your CEASER password" className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm" /></div><button onClick={() => void startMfaEnrollment()} disabled={securityBusy === "mfa"} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{securityBusy === "mfa" ? "Verifying..." : "Enable 2FA"}</button></div> : <div className="space-y-4"><div><p className="font-medium">Step 2 — Choose authenticator</p><p className="text-sm text-muted-foreground">Scan the QR code using your authenticator app.</p></div>{getMfaQr(mfaEnrollment) ? <img src={getMfaQr(mfaEnrollment)} alt="Authenticator QR code" className="h-44 w-44 rounded-xl bg-white p-2" /> : null}<p className="text-sm text-muted-foreground">Can&apos;t scan? Use setup key: <span className="font-mono text-foreground">{getMfaSecret(mfaEnrollment)}</span></p><div><label className="mb-2 block text-sm font-medium">Step 3 — Verify</label><input value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="_ _ _ _ _ _" className="h-12 w-full rounded-lg border border-border bg-background px-3 text-center font-mono text-lg tracking-[0.45em]" /></div><button onClick={() => void verifyMfaEnrollment()} disabled={securityBusy === "mfa-verify" || mfaCode.length !== 6} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{securityBusy === "mfa-verify" ? "Verifying..." : "Verify & Enable"}</button></div>}
+            </div>
           </div>
         )}
 
@@ -1709,6 +1727,15 @@ function defaultVoiceSettings(): VoiceSettingsRecord {
     speech_volume: 1,
     language: "en",
   }
+}
+
+function PasswordField({ id, label, value, onChange, placeholder, autoComplete }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder: string; autoComplete: string }) {
+  const [visible, setVisible] = useState(false)
+  return <div><label htmlFor={id} className="mb-2 block text-sm font-medium">{label}</label><div className="relative"><input id={id} type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="h-10 w-full rounded-lg border border-border bg-background px-3 pr-10 text-sm outline-none focus:border-primary" /><button type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground">{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
+}
+
+function PasswordRequirements({ password }: { password: string }) {
+  return <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">{[["At least 8 characters", password.length >= 8], ["One uppercase letter", /[A-Z]/.test(password)], ["One lowercase letter", /[a-z]/.test(password)], ["One number", /\d/.test(password)], ["One special character", /[^A-Za-z0-9]/.test(password)]].map(([label, met]) => <span key={label as string} className={cn("flex items-center gap-1.5", met ? "text-emerald-500" : "text-muted-foreground")}><CircleCheck className="h-3.5 w-3.5" />{label as string}</span>)}</div>
 }
 
 function getMfaQr(enrollment: Record<string, unknown>) {

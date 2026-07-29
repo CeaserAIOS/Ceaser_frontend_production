@@ -10,9 +10,8 @@ import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
 import { CeaserLogo } from "../ceaser-logo"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
-import { VoiceControls } from "@/components/voice/VoiceControls"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -30,6 +29,7 @@ interface Message {
   workflow?: WorkflowResult | null
   isTyping?: boolean
   isStreaming?: boolean
+  statusLabel?: string
 }
 
 const ACTIVE_CONVERSATION_KEY = "ceaser_active_conversation_id"
@@ -74,14 +74,15 @@ const detectDocumentRequest = (message: string): DocumentRequest | null => {
   return null
 }
 
-const documentCreatedMessage = (request: DocumentRequest, fileName?: string | null) =>
+const documentCreatedMessage = (request: DocumentRequest, fileName?: string | null, elapsedMs?: number) =>
   [
     "Document Created",
     "",
     `CEASER created a real ${request.label}${fileName ? `: ${fileName}` : ""}.`,
+    elapsedMs !== undefined ? `Created in ${(elapsedMs / 1000).toFixed(1)} seconds.` : null,
     "",
     "You can find it in Files. Use the file actions there to download, review, summarize, or ask CEASER about it.",
-  ].join("\n")
+  ].filter((line): line is string => line !== null).join("\n")
 
 const formatTime = (value?: string) => {
   const date = value ? new Date(value) : new Date()
@@ -221,6 +222,7 @@ export function ChatPage() {
   const [isConversationLoading, setIsConversationLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
+  const chatComposerRef = useRef<HTMLInputElement>(null)
   const preferredConversationRef = useRef<string | null>(null)
   const conversationCacheRef = useRef(new Map<string, Message[]>())
   const conversationRequestCacheRef = useRef(new Map<string, Promise<Message[]>>())
@@ -229,6 +231,7 @@ export function ChatPage() {
   const loadRequestRef = useRef(0)
   const streamAbortRef = useRef<AbortController | null>(null)
   const streamSessionRef = useRef(0)
+  const autoSendSeedRef = useRef(false)
 
   const latestAssistantIntel = useMemo(
     () => [...messages].reverse().find((message) => message.role === "assistant" && (message.workflow || message.research || message.memoriesUsed?.length || message.contributions?.length)),
@@ -262,6 +265,7 @@ export function ChatPage() {
     streamSessionRef.current += 1
     streamAbortRef.current?.abort()
     streamAbortRef.current = null
+    setMessages((current) => current.map((message) => message.isStreaming ? { ...message, isStreaming: false, isTyping: false, content: message.content || "Response stopped." } : message))
     setIsLoading(false)
   }, [])
 
@@ -355,6 +359,8 @@ export function ChatPage() {
       if (seed) {
         setInput(seed)
         window.localStorage.removeItem("ceaser_chat_seed")
+        autoSendSeedRef.current = window.localStorage.getItem("ceaser_chat_autosend") === "true"
+        window.localStorage.removeItem("ceaser_chat_autosend")
       }
       setActiveConversationId(null)
       setMessages([])
@@ -561,11 +567,13 @@ export function ChatPage() {
     return conversation.id
   }
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+  const handleSend = async (messageOverride?: string, forceNewStream = false) => {
+    const content = (messageOverride ?? input).trim()
+    if (!content || (isLoading && !forceNewStream)) return
     cancelActiveStream()
-    const content = input.trim()
     const documentRequest = detectDocumentRequest(content)
+    const sourceAnswer = documentRequest ? [...messages].reverse().find((message) => message.role === "assistant" && !message.isTyping && message.content.trim()) : undefined
+    const sourcePrompt = documentRequest ? [...messages].reverse().find((message) => message.role === "user" && message.content.trim())?.content : undefined
     setInput("")
     setIsLoading(true)
 
@@ -582,6 +590,7 @@ export function ChatPage() {
       timestamp: formatTime(),
       isTyping: true,
       isStreaming: true,
+      statusLabel: documentRequest && sourceAnswer ? `Creating your ${documentRequest.label} from the previous answer… usually under 10 seconds.` : undefined,
     }
     setMessages((current) => [...current, userMessage, typingMessage])
 
@@ -590,18 +599,53 @@ export function ChatPage() {
       conversationId = await ensureConversation()
       const seededMessages = [...messages, userMessage, typingMessage]
       conversationCacheRef.current.set(conversationId, seededMessages)
+      if (documentRequest && sourceAnswer) {
+        const startedAt = performance.now()
+        await chatApi.sendMessage(conversationId, content, "user")
+        const generated = await documentsApi.create({
+          kind: documentRequest.kind,
+          prompt: sourcePrompt ? `Create a document about ${sourcePrompt}` : content,
+          agent_id: documentRequest.agentId,
+          source_content: sourceAnswer.content.slice(0, 50000),
+        })
+        const generatedContent = documentCreatedMessage(documentRequest, generated.document.file_name, performance.now() - startedAt)
+        const generatedRecord = await chatApi.sendMessage(conversationId, generatedContent, "assistant", {
+          generated_document: generated.document,
+          generated_file: generated.file,
+          preview: generated.preview,
+        })
+        const generatedMessage: Message = {
+          id: generatedRecord.id,
+          role: "assistant",
+          content: generatedRecord.content,
+          timestamp: formatTime(generatedRecord.created_at),
+          metadata: metadataFromRecord(generatedRecord),
+          ...richMessageFields(generatedRecord),
+        }
+        setMessages((current) => {
+          const next = current.map((message) => (message.id === typingMessage.id ? generatedMessage : message))
+          if (conversationId) conversationCacheRef.current.set(conversationId, next)
+          return next
+        })
+        setAttachedFiles([])
+        void refreshConversationList()
+        window.dispatchEvent(new Event("ceaser:activity-updated"))
+        return
+      }
       const fileIds = attachedFiles.map((file) => file.id)
       const controller = new AbortController()
       streamAbortRef.current = controller
       const streamSessionId = ++streamSessionRef.current
       let response: CeaserChatResponse | null = null
+      let streamedContent = ""
+      let receivedStreamContent = false
       try {
-        let streamedContent = ""
         let streamError: string | null = null
         await chatApi.sendCeaserMessageStream(content, conversationId, fileIds, {
           onToken: (text) => {
             if (streamSessionRef.current !== streamSessionId) return
             streamedContent += text
+            receivedStreamContent = true
             setMessages((current) =>
               current.map((message) =>
                 message.id === typingMessage.id
@@ -622,7 +666,26 @@ export function ChatPage() {
         if (streamError) throw new Error(streamError)
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return
-        response = await chatApi.sendCeaserMessage(content, conversationId, fileIds)
+        // The stream endpoint stores the user turn before it begins emitting.
+        // Never resend after any streamed content, otherwise one user request
+        // becomes two messages and two assistant responses.
+        if (receivedStreamContent) {
+          response = {
+            scope: "personal_ai_os",
+            conversation_id: conversationId,
+            selected_agents: [],
+            contributions: [],
+            contribution_summary: "Response streamed.",
+            memories_used: [],
+            research: null,
+            workflow: null,
+            context_summary: {},
+            suggestions: [],
+            response: streamedContent,
+          }
+        } else {
+          response = await chatApi.sendCeaserMessage(content, conversationId, fileIds)
+        }
       }
       if (!response) throw new Error("We couldn't complete your request. Please try again.")
       const assistantMessage = responseToMessage(typingMessage.id, response)
@@ -677,6 +740,24 @@ export function ChatPage() {
       streamAbortRef.current = null
       setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
+    if (!autoSendSeedRef.current || !input.trim() || isLoading || isBooting) return
+    autoSendSeedRef.current = false
+    void handleSend()
+  }, [input, isBooting, isLoading])
+
+  const handleEditSentMessage = async (message: Message) => {
+    const updated = (await promptDialog({
+      title: "Edit message",
+      description: "Correct your message. CEASER will stop the current response and answer the edited version.",
+      defaultValue: message.content,
+      confirmLabel: "Use edited message",
+    }))?.trim()
+    if (!updated) return
+    cancelActiveStream()
+    void handleSend(updated, true)
   }
 
   const handleVoiceResponse = async (response: VoiceRespondResponse) => {
@@ -979,6 +1060,7 @@ export function ChatPage() {
                       message={message}
                       previousUserPrompt={findPreviousUserPrompt(messages, index)}
                       onPromptSelect={queueFollowUp}
+                      onEdit={handleEditSentMessage}
                     />
                   ))
                 )}
@@ -1016,6 +1098,7 @@ export function ChatPage() {
                 {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
               </button>
               <input
+                ref={chatComposerRef}
                 type="text"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
@@ -1024,14 +1107,11 @@ export function ChatPage() {
                 disabled={isLoading}
                 className="h-12 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/45 disabled:opacity-50"
               />
-              <VoiceControls conversationId={activeConversationId} disabled={isLoading} onResponse={(response) => void handleVoiceResponse(response)} />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_28px_rgba(16,185,129,0.26)] transition hover:bg-emerald-400 disabled:opacity-50"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
+              {isLoading ? (
+                <button onClick={cancelActiveStream} aria-label="Stop response" title="Stop response" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_28px_rgba(244,63,94,0.26)] transition hover:bg-rose-400"><Square className="h-4 w-4 fill-current" /></button>
+              ) : (
+                <button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_28px_rgba(16,185,129,0.26)] transition hover:bg-emerald-400 disabled:opacity-50"><Send className="h-4 w-4" /></button>
+              )}
             </div>
           </div>
         </section>
@@ -1070,10 +1150,12 @@ function ChatBubble({
   message,
   previousUserPrompt,
   onPromptSelect,
+  onEdit,
 }: {
   message: Message
   previousUserPrompt?: string
   onPromptSelect: (prompt: string) => void
+  onEdit: (message: Message) => void
 }) {
   return (
     <div className={cn("flex w-full gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
@@ -1089,11 +1171,21 @@ function ChatBubble({
         {message.isTyping ? (
           <div className="flex items-center gap-2 text-white/55">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Thinking...</span>
+            <span className="text-sm">{message.statusLabel || "Thinking..."}</span>
           </div>
         ) : (
           <>
             <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />
+            {message.role === "user" && (
+              <button
+                onClick={() => onEdit(message)}
+                className="ml-auto mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/48 transition hover:bg-white/[0.08] hover:text-white"
+                title="Edit and resend message"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
             {message.role === "assistant" && !message.isStreaming && (
               <ResponseActions message={message} previousUserPrompt={previousUserPrompt} onPromptSelect={onPromptSelect} />
             )}

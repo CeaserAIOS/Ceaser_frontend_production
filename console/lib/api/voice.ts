@@ -1,10 +1,7 @@
-import { getAccessToken } from "./client"
+import { getAccessToken, getApiBaseUrl } from "./client"
 import type { CeaserChatResponse } from "./chat"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_CEASER_API_URL ??
-  "https://ceaser-backend-production.onrender.com"
+const API_BASE_URL = getApiBaseUrl()
 
 export type VoiceStatus = "idle" | "listening" | "transcribing" | "processing" | "speaking" | "ready" | "error"
 

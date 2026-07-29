@@ -404,6 +404,26 @@
 }
 
 /* Orbital animation */
+button[data-loading="true"] {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+button[data-loading="true"]::after {
+  content: "";
+  display: inline-block;
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-left: 0.45rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  vertical-align: -0.1rem;
+  animation: ceaser-button-spin 0.7s linear infinite;
+}
+
+@keyframes ceaser-button-spin { to { transform: rotate(360deg); } }
+
 @keyframes orbit {
   from {
     transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg);

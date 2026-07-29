@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { CheckCircle2, CircleDashed, Server, ShieldCheck, Sparkles, Unplug, Mic } from "lucide-react"
-import { getAccessToken } from "@/lib/api/client"
+import { getAccessToken, getApiBaseUrl } from "@/lib/api/client"
 import { integrationsApi } from "@/lib/api/integrations"
 import { cn } from "@/lib/utils"
 
@@ -15,10 +15,7 @@ type StatusItem = {
   icon: typeof CheckCircle2
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_CEASER_API_URL ??
-  "https://ceaser-backend-production.onrender.com"
+const API_BASE_URL = getApiBaseUrl()
 
 export function SystemStatusCard({ compact = false }: { compact?: boolean }) {
   const [apiReady, setApiReady] = useState<boolean | null>(null)

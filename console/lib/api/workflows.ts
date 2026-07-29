@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { apiRequest, invalidateApiCache } from "./client"
 
 export interface WorkflowTemplateRecord {
   id: string
@@ -21,6 +21,14 @@ export interface WorkflowRunRecord {
   updated_at: string
 }
 
+export interface WorkflowStartResponse {
+  workflow_id: string
+  workflow_type: string
+  status: string
+  result_summary?: string | null
+  final_response?: string | null
+}
+
 export interface WorkflowStepRecord {
   id: string
   workflow_id: string
@@ -38,6 +46,24 @@ export const workflowsApi = {
   get: (workflowId: string) => apiRequest<WorkflowRunRecord>(`/workflows/${workflowId}`),
   steps: (workflowId: string) => apiRequest<WorkflowStepRecord[]>(`/workflows/${workflowId}/steps`),
   start: (message: string, conversationId?: string | null, fileIds?: string[]) =>
-    apiRequest("/workflows/start", { method: "POST", body: { message, conversation_id: conversationId, file_ids: fileIds ?? [] } }),
+    apiRequest<WorkflowStartResponse>("/workflows/start", { method: "POST", body: { message, conversation_id: conversationId, file_ids: fileIds ?? [] } }).then((response) => {
+      invalidateApiCache(["/workflows"])
+      return response
+    }),
+  action: (workflowId: string, action: "approved" | "archived") =>
+    apiRequest<WorkflowRunRecord>(`/workflows/${workflowId}/status/${action}`, { method: "POST" }).then((response) => {
+      invalidateApiCache(["/workflows"])
+      return response
+    }),
+  regenerate: (workflowId: string) =>
+    apiRequest<WorkflowStartResponse>(`/workflows/${workflowId}/regenerate`, { method: "POST" }).then((response) => {
+      invalidateApiCache(["/workflows"])
+      return response
+    }),
+  delete: (workflowId: string) =>
+    apiRequest<void>(`/workflows/${workflowId}`, { method: "DELETE" }).then((response) => {
+      invalidateApiCache(["/workflows"])
+      return response
+    }),
   cancel: (workflowId: string) => apiRequest<WorkflowRunRecord>(`/workflows/${workflowId}/cancel`, { method: "POST" }),
 }

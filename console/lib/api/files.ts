@@ -1,9 +1,6 @@
-import { apiRequest, getAccessToken, invalidateApiCache } from "./client"
+import { apiRequest, getAccessToken, getApiBaseUrl, invalidateApiCache } from "./client"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_CEASER_API_URL ??
-  "https://ceaser-backend-production.onrender.com"
+const API_BASE_URL = getApiBaseUrl()
 
 export interface FileRecord {
   id: string

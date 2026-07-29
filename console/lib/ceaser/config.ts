@@ -257,7 +257,6 @@ const baseNavigationItems: NavigationItem[] = [
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "student", label: "Student Hub", icon: GraduationCap },
   { id: "agents", label: "Agents", icon: Users },
-  { id: "drafts", label: "Workflows", icon: FileText },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "memory", label: "Memory", icon: BrainCircuit },
   { id: "files", label: "Files", icon: FileText },

@@ -4,15 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import type { ChangeEvent, ReactNode } from "react"
 import { draftsApi, type DraftRecord } from "@/lib/api/drafts"
 import { filesApi, type DocumentAction, type FileContentRecord, type FileRecord } from "@/lib/api/files"
-import { getAccessToken } from "@/lib/api/client"
+import { getAccessToken, getApiBaseUrl } from "@/lib/api/client"
 import { useApp } from "@/lib/app-context"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
 import { cn } from "@/lib/utils"
 import {
-  BookOpen,
   ChevronDown,
-  ClipboardList,
   CloudUpload,
   Copy,
   Download,
@@ -22,7 +20,6 @@ import {
   FileText,
   Grid,
   Image as ImageIcon,
-  Layers,
   List,
   Loader2,
   MessageSquarePlus,
@@ -35,19 +32,7 @@ import {
   ZoomIn,
 } from "lucide-react"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_CEASER_API_URL ??
-  "https://ceaser-backend-production.onrender.com"
-
-const actions: { id: DocumentAction; label: string; icon: typeof Sparkles }[] = [
-  { id: "explain", label: "Explain", icon: Sparkles },
-  { id: "summarize", label: "Summarize", icon: BookOpen },
-  { id: "notes", label: "Generate Notes", icon: FileText },
-  { id: "flashcards", label: "Flashcards", icon: Layers },
-  { id: "mcqs", label: "Quiz", icon: ClipboardList },
-  { id: "actions", label: "Action Plan", icon: ClipboardList },
-]
+const API_BASE_URL = getApiBaseUrl()
 
 const intelligencePanels = [
   "Executive Summary",
@@ -82,6 +67,7 @@ export function FilesPage() {
   const [activeAction, setActiveAction] = useState<DocumentAction | "question" | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState(false)
+  const [previewPage, setPreviewPage] = useState(1)
   const [zoomLevel, setZoomLevel] = useState(100)
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false)
   const [isAssigningProject, setIsAssigningProject] = useState(false)
@@ -127,7 +113,7 @@ export function FilesPage() {
         setDrafts(draftRecords)
         setProjects(projectRecords)
         setMemories(memoryRecords)
-        if (records[0]) setSelectedFile(await filesApi.get(records[0].id))
+      if (records[0]) setSelectedFile(await filesApi.get(records[0].id))
       } finally {
         setIsLoading(false)
       }
@@ -136,11 +122,20 @@ export function FilesPage() {
   }, [])
 
   useEffect(() => {
+    setPreviewPage(1)
+  }, [selectedFile?.id])
+
+  useEffect(() => {
     let objectUrl: string | null = null
     const loadPreview = async () => {
       setPreviewUrl(null)
       setPreviewError(false)
       if (!selectedFile || !canPreview) return
+      const storagePath = selectedFile.storage_path || ""
+      if (storagePath && !storagePath.startsWith("local://") && !storagePath.startsWith("supabase://")) {
+        setPreviewError(true)
+        return
+      }
       try {
         const token = getAccessToken()
         const response = await fetch(`${API_BASE_URL}/files/${selectedFile.id}/preview`, {
@@ -191,9 +186,26 @@ export function FilesPage() {
       const panel = question ? "AI Suggestions" : panelForAction(action)
       setAnalysisByPanel((current) => ({ ...current, [panel]: normalizeAiText(result.response) }))
       setActivePanel(panel)
+    } catch (error) {
+      const panel = question ? "AI Suggestions" : panelForAction(action)
+      const message = error instanceof Error ? error.message : "Analysis could not be completed. Please try again."
+      setAnalysisByPanel((current) => ({ ...current, [panel]: message }))
+      setActivePanel(panel)
     } finally {
       setActiveAction(null)
     }
+  }
+
+  const toggleSummary = () => {
+    if (analysisByPanel["Executive Summary"]) {
+      setAnalysisByPanel((current) => {
+        const next = { ...current }
+        delete next["Executive Summary"]
+        return next
+      })
+      return
+    }
+    void handleAnalyze("summarize")
   }
 
   const askDocument = async () => {
@@ -250,7 +262,7 @@ export function FilesPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[22rem_minmax(0,1fr)_22rem]">
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col rounded-2xl border border-border bg-card/55 p-3">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold">File Library</p>
@@ -314,34 +326,32 @@ export function FilesPage() {
                   <button onClick={() => setIsProjectPickerOpen(true)} className="flex items-center gap-2 rounded-xl border border-border bg-background/40 px-3 py-2 text-xs font-medium hover:bg-secondary">
                     <MessageSquarePlus className="h-4 w-4" /> Add to Project
                   </button>
+                  <button onClick={toggleSummary} disabled={Boolean(activeAction)} className="flex items-center gap-2 rounded-xl border border-border bg-background/40 px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50">
+                    {activeAction === "summarize" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {activeAction === "summarize" ? "Summarizing..." : analysisByPanel["Executive Summary"] ? "Hide Summary" : "Summarize"}
+                  </button>
                   <button onClick={() => void filesApi.download(selectedFile)} className="flex items-center gap-2 rounded-xl border border-border bg-background/40 px-3 py-2 text-xs font-medium hover:bg-secondary">
                     <Download className="h-4 w-4" /> Download
                   </button>
                 </div>
               </div>
+              {analysisByPanel["Executive Summary"] && (
+                <div className="max-h-44 overflow-y-auto border-b border-border bg-primary/5 px-4 py-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Summary</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{analysisByPanel["Executive Summary"]}</p>
+                </div>
+              )}
 
               <div className="grid min-h-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)]">
                 <div className="min-h-0 space-y-3 overflow-y-auto border-r border-border bg-background/20 p-3">
-                  {Array.from({ length: Math.min(pageCount, 6) }).map((_, index) => (
-                    <button key={index} className={cn("flex aspect-[3/4] w-full flex-col items-center justify-center rounded-lg border text-xs transition", index === 0 ? "border-primary bg-primary/10 text-primary" : "border-border bg-card/60 text-muted-foreground hover:border-primary/40")}>
+                  {Array.from({ length: pageCount }).map((_, index) => (
+                    <button key={index} onClick={() => setPreviewPage(index + 1)} className={cn("flex aspect-[3/4] w-full flex-col items-center justify-center rounded-lg border text-xs transition", previewPage === index + 1 ? "border-primary bg-primary/10 text-primary" : "border-border bg-card/60 text-muted-foreground hover:border-primary/40")}>
                       {getFileIcon(selectedFile.file_type)}
                       <span className="mt-2">Page {index + 1}</span>
                     </button>
                   ))}
                 </div>
-                <DocumentPreview file={selectedFile} previewUrl={previewUrl} previewError={previewError} zoomLevel={zoomLevel} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 border-t border-border bg-background/35 p-3">
-                {actions.map((action) => {
-                  const Icon = action.icon
-                  return (
-                    <button key={action.id} onClick={() => void handleAnalyze(action.id)} disabled={Boolean(activeAction)} className="flex items-center gap-2 rounded-xl border border-border bg-card/70 px-3 py-2 text-xs font-semibold hover:border-primary/50 hover:bg-primary/10 disabled:opacity-50">
-                      {activeAction === action.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4 text-primary" />}
-                      {action.label}
-                    </button>
-                  )
-                })}
+                <DocumentPreview file={selectedFile} previewUrl={previewUrl} previewError={previewError} previewPage={previewPage} zoomLevel={zoomLevel} />
               </div>
             </>
           ) : (
@@ -353,39 +363,6 @@ export function FilesPage() {
           )}
         </main>
 
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-border bg-card/55 p-4">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-primary">CEASER Intelligence</h2>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {intelligencePanels.map((panel, index) => (
-              <details key={panel} className="group rounded-xl border border-border bg-background/35" open={panel === activePanel || (index === 0 && !analysisByPanel[activePanel])}>
-                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-3 text-sm font-medium">
-                  {panel}
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="border-t border-border px-3 py-3">
-                  {panel === "Related Projects" ? (
-                    <RelatedProjectPanel linkedProject={linkedProject} onAdd={() => setIsProjectPickerOpen(true)} />
-                  ) : panel === "Related Memories" ? (
-                    <RelatedMemoryPanel memories={relatedMemories} />
-                  ) : analysisByPanel[panel] ? (
-                    <FormattedPanelOutput content={analysisByPanel[panel]} panel={panel} />
-                  ) : (
-                    <p className="text-sm leading-relaxed text-muted-foreground">{getPanelContent(panel, selectedFile, drafts.length)}</p>
-                  )}
-                </div>
-              </details>
-            ))}
-          </div>
-          <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/8 p-3">
-            <p className="mb-2 text-xs font-semibold text-primary">Ask CEASER about this document</p>
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2">
-              <input value={documentQuestion} onChange={(event) => setDocumentQuestion(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void askDocument()} placeholder="Ask anything..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
-              <button onClick={() => void askDocument()} disabled={!documentQuestion.trim() || Boolean(activeAction)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-50">
-                {activeAction === "question" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        </aside>
       </div>
       {isProjectPickerOpen && selectedFile && (
         <ProjectPicker
@@ -401,20 +378,20 @@ export function FilesPage() {
   )
 }
 
-function DocumentPreview({ file, previewUrl, previewError, zoomLevel }: { file: FileContentRecord; previewUrl: string | null; previewError: boolean; zoomLevel: number }) {
+function DocumentPreview({ file, previewUrl, previewError, previewPage, zoomLevel }: { file: FileContentRecord; previewUrl: string | null; previewError: boolean; previewPage: number; zoomLevel: number }) {
   const type = file.file_type.toLowerCase()
   return (
     <section className="min-h-0 overflow-y-auto bg-[#050B18]/60 p-6">
       <div className="relative mx-auto min-h-full rounded-xl border border-border bg-white p-6 text-slate-950 shadow-[0_24px_80px_rgba(0,0,0,0.32)]" style={{ width: `${zoomLevel}%`, maxWidth: "72rem" }}>
         {previewUrl && type === "pdf" ? (
-          <iframe src={`${previewUrl}#toolbar=0&navpanes=0`} title={file.name} className="h-[72vh] w-full rounded-lg border border-slate-200 bg-white" />
+          <iframe key={`${previewUrl}-${previewPage}`} src={`${previewUrl}#page=${previewPage}&toolbar=0&navpanes=0`} title={file.name} className="h-[72vh] w-full rounded-lg border border-slate-200 bg-white" />
         ) : previewUrl && ["png", "jpg", "jpeg"].includes(type) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={previewUrl} alt={file.name} className="mx-auto max-h-[72vh] rounded-lg object-contain" />
         ) : (
           <article className="prose prose-slate max-w-none">
             <h1>{file.name.replace(/\.[^.]+$/, "")}</h1>
-            {previewError && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Live file preview is unavailable, so CEASER is showing extracted content.</p>}
+            {previewError && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The original file is not available in this local workspace, so CEASER is showing extracted content. Re-upload it to restore live preview.</p>}
             {file.extracted_content ? (
               file.extracted_content.split(/\n{2,}/).slice(0, 18).map((paragraph, index) => (
                 <p key={index}>{paragraph.trim()}</p>

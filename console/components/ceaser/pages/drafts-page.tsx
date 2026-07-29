@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import { draftsApi, type DraftRecord, type DraftSection } from "@/lib/api/drafts"
+import { ApiError } from "@/lib/api/client"
 import { documentsApi, type GeneratedDocument } from "@/lib/api/documents"
+import { workflowsApi, type WorkflowRunRecord, type WorkflowStepRecord } from "@/lib/api/workflows"
 import { agents } from "@/lib/data"
 import { useApp } from "@/lib/app-context"
 import { AgentAvatar } from "../agent-avatar"
@@ -12,20 +14,28 @@ export function DraftsPage() {
   const { confirmDialog, setCurrentPage } = useApp()
   const [drafts, setDrafts] = useState<DraftRecord[]>([])
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
+  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRunRecord[]>([])
   const [activeDraft, setActiveDraft] = useState<DraftRecord | null>(null)
   const [activeDocument, setActiveDocument] = useState<GeneratedDocument | null>(null)
+  const [activeWorkflow, setActiveWorkflow] = useState<WorkflowRunRecord | null>(null)
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   const load = async () => {
     setIsLoading(true)
     try {
-      const [draftResult, documentResult] = await Promise.allSettled([draftsApi.list(), documentsApi.list()])
+      const [draftResult, documentResult, workflowResult] = await Promise.allSettled([draftsApi.list(), documentsApi.list(), workflowsApi.list()])
       const draftRecords = draftResult.status === "fulfilled" ? draftResult.value : []
       const documentRecords = documentResult.status === "fulfilled" ? documentResult.value : []
+      const workflowRecords = workflowResult.status === "fulfilled" ? workflowResult.value : []
       setDrafts(draftRecords)
       setDocuments(documentRecords)
-      setActiveDraft(draftRecords[0] ?? null)
-      setActiveDocument(draftRecords[0] ? null : documentRecords[0] ?? null)
+      setWorkflowRuns(workflowRecords)
+      setActiveWorkflow(workflowRecords[0] ?? null)
+      setActiveDraft(workflowRecords[0] ? null : draftRecords[0] ?? null)
+      setActiveDocument(workflowRecords[0] || draftRecords[0] ? null : documentRecords[0] ?? null)
     } finally {
       setIsLoading(false)
     }
@@ -36,9 +46,22 @@ export function DraftsPage() {
   }, [])
 
   const transition = async (draft: DraftRecord, action: "approved" | "regenerated" | "archived") => {
-    const updated = await draftsApi.action(draft.id, action)
-    setActiveDraft(updated)
-    setDrafts(await draftsApi.list())
+    setActionError(null)
+    setIsTransitioning(true)
+    try {
+      const updated = await draftsApi.action(draft.id, action)
+      setActiveDraft(updated)
+      setDrafts(await draftsApi.list())
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        await load()
+        setActionError("That workflow was already removed. The workflow list has been refreshed.")
+        return
+      }
+      setActionError(error instanceof Error ? error.message : "Could not update this workflow.")
+    } finally {
+      setIsTransitioning(false)
+    }
   }
 
   const deleteDraft = async (draft: DraftRecord) => {
@@ -49,11 +72,24 @@ export function DraftsPage() {
       tone: "danger",
     })
     if (!confirmed) return
-    await draftsApi.delete(draft.id)
-    const records = await draftsApi.list()
-    setDrafts(records)
-    setActiveDraft(records[0] ?? null)
-    setActiveDocument(records[0] ? null : documents[0] ?? null)
+    setIsTransitioning(true)
+    setActionError(null)
+    try {
+      await draftsApi.delete(draft.id)
+      const records = await draftsApi.list()
+      setDrafts(records)
+      setActiveDraft(records[0] ?? null)
+      setActiveDocument(records[0] ? null : documents[0] ?? null)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        await load()
+        setActionError("That workflow was already removed. The workflow list has been refreshed.")
+      } else {
+        setActionError(error instanceof Error ? error.message : "Could not delete this workflow.")
+      }
+    } finally {
+      setIsTransitioning(false)
+    }
   }
 
   return (
@@ -71,7 +107,7 @@ export function DraftsPage() {
               {drafts.map((draft) => {
             const agent = agents.find((item) => item.id === draft.agent_id)
             return (
-              <button key={draft.id} onClick={() => { setActiveDraft(draft); setActiveDocument(null) }} className="mb-2 flex w-full gap-3 rounded-lg border border-border bg-background/40 p-3 text-left hover:bg-secondary">
+                  <button key={draft.id} onClick={() => { setActiveDraft(draft); setActiveDocument(null); setActiveSectionIndex(0) }} className="mb-2 flex w-full gap-3 rounded-lg border border-border bg-background/40 p-3 text-left hover:bg-secondary">
                 {agent ? <AgentAvatar agent={agent} size="sm" /> : <FileText className="h-5 w-5 text-primary" />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{draft.title}</span>
@@ -80,6 +116,15 @@ export function DraftsPage() {
               </button>
             )
           })}
+              {workflowRuns.map((workflow) => (
+                <button key={workflow.id} onClick={() => { setActiveWorkflow(workflow); setActiveDraft(null); setActiveDocument(null); setActiveSectionIndex(0) }} className="mb-2 flex w-full gap-3 rounded-lg border border-border bg-background/40 p-3 text-left hover:bg-secondary">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">Generated {workflow.workflow_type.replaceAll("_", " ")} workflow</span>
+                    <span className="text-xs capitalize text-muted-foreground">{workflow.status} / {workflow.result_summary || "Ready"}</span>
+                  </span>
+                </button>
+              ))}
               {documents.map((document) => {
                 const agent = agents.find((item) => item.id === document.agent_id)
                 return (
@@ -94,29 +139,43 @@ export function DraftsPage() {
               })}
             </>
           )}
-          {!isLoading && !drafts.length && !documents.length && <p className="py-10 text-center text-sm text-muted-foreground">No workflows yet.</p>}
+          {!isLoading && !drafts.length && !documents.length && !workflowRuns.length && <p className="py-10 text-center text-sm text-muted-foreground">No workflows yet.</p>}
         </div>
       </aside>
 
       <main className="min-h-0 overflow-hidden rounded-lg border border-border bg-secondary/20">
-        {activeDraft ? (
+        {activeWorkflow ? (
+          <WorkflowRunPreview workflow={activeWorkflow} onChanged={load} />
+        ) : activeDraft ? (
           <div className="flex h-full min-h-0 flex-col">
             <div className="border-b border-border p-5">
               <h2 className="text-2xl font-semibold">{activeDraft.title}</h2>
               <p className="text-sm capitalize text-muted-foreground">{activeDraft.draft_type.replace("_", " ")} / {activeDraft.status} / {activeDraft.progress}%</p>
               <div className="mt-4 flex gap-2">
-                <button onClick={() => void transition(activeDraft, "approved")} className="flex items-center gap-2 rounded-lg border border-emerald-500/50 px-3 py-2 text-sm text-emerald-400"><CheckCircle2 className="h-4 w-4" />Approve</button>
-                <button onClick={() => void transition(activeDraft, "regenerated")} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary"><RotateCcw className="h-4 w-4" />Regenerate</button>
-                <button onClick={() => void transition(activeDraft, "archived")} className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">Archive</button>
-                <button onClick={() => void deleteDraft(activeDraft)} className="flex items-center gap-2 rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"><Trash2 className="h-4 w-4" />Delete</button>
+                <button disabled={isTransitioning} onClick={() => void transition(activeDraft, "approved")} className="flex items-center gap-2 rounded-lg border border-emerald-500/50 px-3 py-2 text-sm text-emerald-400 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />{isTransitioning ? "Updating..." : "Approve"}</button>
+                <button disabled={isTransitioning} onClick={() => void transition(activeDraft, "regenerated")} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50"><RotateCcw className={isTransitioning ? "h-4 w-4 animate-spin" : "h-4 w-4"} />Regenerate</button>
+                <button disabled={isTransitioning} onClick={() => void transition(activeDraft, "archived")} className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Archive</button>
+                <button disabled={isTransitioning} onClick={() => void deleteDraft(activeDraft)} className="flex items-center gap-2 rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50"><Trash2 className="h-4 w-4" />Delete</button>
               </div>
+              {actionError && <p className="mt-3 text-sm text-amber-300">{actionError}</p>}
             </div>
             <div className="grid min-h-0 flex-1 gap-4 p-5 lg:grid-cols-[280px_1fr]">
               <div className="space-y-2">
-                {draftOutline(activeDraft).map((title, index) => <div key={`${title}-${index}`} className="rounded-lg border border-border bg-background/40 px-3 py-2 text-sm">{index + 1}. {title}</div>)}
+                {draftOutline(activeDraft).map((title, index) => (
+                  <button
+                    key={`${title}-${index}`}
+                    onClick={() => {
+                      setActiveSectionIndex(index)
+                      document.getElementById(`workflow-section-${index}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+                    }}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${activeSectionIndex === index ? "border-primary bg-primary/15 text-primary shadow-[0_0_20px_rgba(124,58,237,0.18)]" : "border-border bg-background/40 hover:bg-secondary"}`}
+                  >
+                    {index + 1}. {title}
+                  </button>
+                ))}
               </div>
               <div className="overflow-y-auto rounded-lg border border-border bg-background/40 p-5">
-                <DraftPreview draft={activeDraft} />
+                <DraftPreview draft={activeDraft} activeSectionIndex={activeSectionIndex} />
               </div>
             </div>
           </div>
@@ -156,6 +215,88 @@ export function DraftsPage() {
   )
 }
 
+function WorkflowRunPreview({ workflow, onChanged }: { workflow: WorkflowRunRecord; onChanged: () => Promise<void> }) {
+  const { confirmDialog } = useApp()
+  const [steps, setSteps] = useState<WorkflowStepRecord[]>([])
+  const [isActionRunning, setIsActionRunning] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void workflowsApi.steps(workflow.id).then(setSteps).catch(() => setSteps([]))
+  }, [workflow.id])
+
+  const generatedOutput = String(workflow.metadata_json.generated_response || workflow.result_summary || "CEASER generated this workflow. Review the completed steps below.")
+  const nextActions = Array.isArray(workflow.metadata_json.next_actions) ? workflow.metadata_json.next_actions : []
+
+  const runAction = async (action: "approved" | "archived" | "regenerate" | "delete") => {
+    if (action === "delete") {
+      const confirmed = await confirmDialog({ title: "Delete workflow?", description: "This removes the generated workflow and its steps permanently.", confirmLabel: "Delete", tone: "danger" })
+      if (!confirmed) return
+    }
+    setIsActionRunning(true)
+    setActionError(null)
+    try {
+      if (action === "regenerate") await workflowsApi.regenerate(workflow.id)
+      else if (action === "delete") await workflowsApi.delete(workflow.id)
+      else await workflowsApi.action(workflow.id, action)
+      await onChanged()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not update this workflow.")
+    } finally {
+      setIsActionRunning(false)
+    }
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-border p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Generated workflow</p>
+        <h2 className="mt-1 text-2xl font-semibold capitalize">{workflow.workflow_type.replaceAll("_", " ")} workflow</h2>
+        <p className="text-sm capitalize text-muted-foreground">{workflow.status} / {workflow.result_summary || "Generated by CEASER"}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button disabled={isActionRunning} onClick={() => void runAction("approved")} className="rounded-lg border border-emerald-500/50 px-3 py-2 text-sm text-emerald-400 disabled:opacity-50">Approve</button>
+          <button disabled={isActionRunning} onClick={() => void runAction("regenerate")} className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Regenerate</button>
+          <button disabled={isActionRunning} onClick={() => void runAction("archived")} className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Archive</button>
+          <button disabled={isActionRunning} onClick={() => void runAction("delete")} className="rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50">Delete</button>
+        </div>
+        {actionError && <p className="mt-3 text-sm text-amber-300">{actionError}</p>}
+      </div>
+      <div className="grid min-h-0 flex-1 gap-4 p-5 lg:grid-cols-[280px_1fr]">
+        <div className="space-y-2 overflow-y-auto">
+          {steps.map((step, index) => (
+            <div key={step.id} className="rounded-lg border border-border bg-background/40 px-3 py-2 text-sm">
+              {index + 1}. {step.agent_name} <span className="text-muted-foreground">/ {step.status}</span>
+            </div>
+          ))}
+          {!steps.length && <p className="text-sm text-muted-foreground">Loading workflow steps...</p>}
+        </div>
+        <div className="overflow-y-auto rounded-lg border border-border bg-background/40 p-5">
+          <section className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+            <h3 className="font-semibold">Generated workflow output</h3>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{generatedOutput}</p>
+          </section>
+          {nextActions.length > 0 && (
+            <section className="mt-3 rounded-lg border border-border bg-background/50 p-4">
+              <h3 className="font-semibold">Next actions</h3>
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {nextActions.map((action, index) => <li key={`${String(action)}-${index}`}>- {String(action)}</li>)}
+              </ul>
+            </section>
+          )}
+          <section className="mt-3 grid gap-3 md:grid-cols-2">
+            {steps.map((step) => (
+              <div key={`${step.id}-output`} className="rounded-lg border border-border bg-background/50 p-4">
+                <h3 className="font-semibold">{step.agent_name}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{step.output_summary || "Completed workflow step."}</p>
+              </div>
+            ))}
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function draftOutline(draft: DraftRecord): string[] {
   const content = workflowContent(draft.content)
   const slides = asArray<{ title?: string }>(content.slides)
@@ -175,7 +316,7 @@ function draftOutline(draft: DraftRecord): string[] {
   return [draft.title]
 }
 
-function DraftPreview({ draft }: { draft: DraftRecord }) {
+function DraftPreview({ draft, activeSectionIndex }: { draft: DraftRecord; activeSectionIndex: number }) {
   const content = workflowContent(draft.content)
   const slides = asArray<{ slide_number?: number; title?: string; purpose?: string; bullets?: string[]; visual_suggestion?: string; speaker_notes?: string }>(content.slides)
   const keyFindings = asArray<{ finding?: string; evidence?: string }>(content.key_findings)
@@ -270,24 +411,28 @@ function DraftPreview({ draft }: { draft: DraftRecord }) {
     return (
       <div className="grid gap-3 md:grid-cols-2">
         {milestones.map((milestone, index) => (
-          <section key={`${milestone.name ?? "milestone"}-${index}`} className="rounded-lg border border-border bg-background/50 p-4">
+          <section id={`workflow-section-${index}`} key={`${milestone.name ?? "milestone"}-${index}`} className={`rounded-lg border bg-background/50 p-4 transition ${activeSectionIndex === index ? "border-primary ring-2 ring-primary/35 shadow-[0_0_24px_rgba(124,58,237,0.18)]" : "border-border"}`}>
             <h3 className="font-semibold">{milestone.name ?? "Milestone"}</h3>
             <p className="mt-1 text-xs text-muted-foreground">Priority: {milestone.priority ?? "medium"} / Deadline: {milestone.deadline ?? "TBD"}</p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{asArray<string>(milestone.tasks).map((task) => <li key={task}>- {task}</li>)}</ul>
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+              {asArray<unknown>(milestone.tasks).map((task, taskIndex) => (
+                <li key={`${milestone.name ?? "milestone"}-${index}-task-${taskIndex}`}>- {workflowTaskLabel(task)}</li>
+              ))}
+            </ul>
           </section>
         ))}
       </div>
     )
   }
-  return <GenericWorkflowPreview content={content} />
+  return <GenericWorkflowPreview content={content} activeSectionIndex={activeSectionIndex} />
 }
 
-function GenericWorkflowPreview({ content }: { content: Record<string, unknown> }) {
+function GenericWorkflowPreview({ content, activeSectionIndex }: { content: Record<string, unknown>; activeSectionIndex: number }) {
   const entries = Object.entries(content).filter(([key, value]) => !["draft_type", "target_app", "type"].includes(key) && value !== null && value !== undefined && value !== "")
   return (
     <div className="space-y-3">
-      {entries.map(([key, value]) => (
-        <section key={key} className="rounded-lg border border-border bg-background/50 p-4">
+      {entries.map(([key, value], index) => (
+        <section id={`workflow-section-${index}`} key={key} className={`rounded-lg border bg-background/50 p-4 transition ${activeSectionIndex === index ? "border-primary ring-2 ring-primary/35 shadow-[0_0_24px_rgba(124,58,237,0.18)]" : "border-border"}`}>
           <h3 className="font-semibold capitalize">{key.replaceAll("_", " ")}</h3>
           <div className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {renderValue(value)}
@@ -327,6 +472,15 @@ function renderValue(value: unknown): ReactNode {
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
+}
+
+function workflowTaskLabel(task: unknown): string {
+  if (typeof task === "string") return task
+  if (task && typeof task === "object") {
+    const record = task as Record<string, unknown>
+    return String(record.title ?? record.name ?? record.task ?? record.description ?? "Workflow task")
+  }
+  return String(task ?? "Workflow task")
 }
 
 function workflowContent(content: DraftRecord["content"] | null | undefined): DraftRecord["content"] {

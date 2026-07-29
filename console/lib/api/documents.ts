@@ -46,7 +46,7 @@ export const documentsApi = {
     if (params?.agent_id) query.set("agent_id", params.agent_id)
     return apiRequest<GeneratedDocument[]>(`/documents${query.toString() ? `?${query}` : ""}`)
   },
-  create: (payload: { kind: DocumentKind; prompt: string; template_id?: string | null; agent_id?: string | null }) =>
+  create: (payload: { kind: DocumentKind; prompt: string; template_id?: string | null; agent_id?: string | null; source_content?: string | null }) =>
     apiRequest<{ document: GeneratedDocument; file: Record<string, unknown>; preview: string }>("/documents", { method: "POST", body: payload }),
   export: (documentId: string) =>
     apiRequest<{ downloadUrl: string; file_id: string }>(`/documents/${documentId}/export`, { method: "POST" }),

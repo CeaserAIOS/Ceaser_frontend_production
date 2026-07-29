@@ -3,10 +3,14 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   cacheTtlMs?: number
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_CEASER_API_URL ??
-  "https://ceaser-backend-production.onrender.com"
+export function getApiBaseUrl() {
+  if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    return "http://127.0.0.1:8000"
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_CEASER_API_URL ?? "https://ceaser-backend-production.onrender.com"
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 const ACCESS_TOKEN_KEY = "ceaser_access_token"
 const REFRESH_TOKEN_KEY = "ceaser_refresh_token"
@@ -147,6 +151,7 @@ function timeoutFor(path: string) {
   ) {
     return path.startsWith("/commercial") || path.startsWith("/billing") ? 30000 : 180000
   }
+  if (/^\/files\/[^/]+\/analyze$/.test(path)) return 90000
   return 12000
 }
 

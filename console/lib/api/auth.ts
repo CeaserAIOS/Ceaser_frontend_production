@@ -38,8 +38,10 @@ export const authApi = {
       throw new Error("Google login is not configured.")
     }
     const isDesktop = window.location.protocol === "ceaser-app:"
-    const appUrl = (
-      process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    const appUrl = (isLocalhost
+      ? `${window.location.origin}/console`
+      : process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
     ).replace(/\/$/, "")
     const callbackUrl = isDesktop
       ? "ceaser-app://bundle/auth/callback/"
@@ -70,8 +72,13 @@ export const authApi = {
       method: "POST",
       body: { email, redirect_to },
     }),
-  updatePassword: (password: string) =>
+  updatePassword: (currentPassword: string, password: string) =>
     apiRequest<{ status: string; message: string }>("/auth/password/update", {
+      method: "POST",
+      body: { current_password: currentPassword, password },
+    }),
+  verifyPassword: (password: string) =>
+    apiRequest<{ status: string; message: string }>("/auth/password/verify", {
       method: "POST",
       body: { password },
     }),

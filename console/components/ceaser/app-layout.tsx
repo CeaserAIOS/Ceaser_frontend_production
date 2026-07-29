@@ -20,6 +20,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     <AppProvider>
       <WelcomeGate>
         <AppHotkeyBridge />
+        <ButtonInteractionFeedback />
         <div className="flex flex-col h-screen overflow-hidden bg-background">
           {typeof window !== 'undefined' && !!(window as any).ceaserDesktop?.windowClose && <WindowTitlebar />}
           <div className="spatial-shell flex min-h-0 flex-1 overflow-hidden p-3">
@@ -53,6 +54,25 @@ function AppHotkeyBridge() {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [setIsVoiceModalOpen])
+
+  return null
+}
+
+function ButtonInteractionFeedback() {
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const button = (event.target as Element | null)?.closest("button") as HTMLButtonElement | null
+      if (!button || button.disabled || button.dataset.loading === "true") return
+      button.dataset.loading = "true"
+      button.setAttribute("aria-busy", "true")
+      window.setTimeout(() => {
+        button.dataset.loading = "false"
+        button.removeAttribute("aria-busy")
+      }, 450)
+    }
+    document.addEventListener("click", onClick)
+    return () => document.removeEventListener("click", onClick)
+  }, [])
 
   return null
 }

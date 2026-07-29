@@ -29,15 +29,16 @@ import {
 
 type Filter = "all" | "connected" | "available"
 
-const liveProviders = new Set(["google-calendar", "gmail", "google-drive", "google-tasks", "google-classroom"])
+const liveProviders = new Set<string>()
+const launchMessage = "Prepared for verified access after launch."
 
 const fallbackProviders: IntegrationRecord[] = [
-  providerStub("gmail", "Gmail", "Read inbox metadata, unread email, important email, and labels.", "not_connected"),
-  providerStub("google-calendar", "Google Calendar", "Read calendars, events, upcoming schedule, and event details.", "not_connected"),
-  providerStub("google-drive", "Google Drive", "Read Drive file metadata and supported document content.", "not_connected"),
-  providerStub("google-tasks", "Google Tasks", "Read task lists, tasks, and due dates.", "not_connected"),
-  providerStub("google-classroom", "Google Classroom", "Read courses, coursework, assignments, and due dates.", "not_connected"),
-  providerStub("notion", "Notion", "Sync notes, docs and knowledge.", "available"),
+  providerStub("gmail", "Gmail", "Email assistance prepared for verified Google Workspace access.", "coming_soon"),
+  providerStub("google-calendar", "Google Calendar", "Calendar intelligence prepared for verified Google Workspace access.", "coming_soon"),
+  providerStub("google-drive", "Google Drive", "Drive file context prepared for verified Google Workspace access.", "coming_soon"),
+  providerStub("google-tasks", "Google Tasks", "Task sync prepared for verified Google Workspace access.", "coming_soon"),
+  providerStub("google-classroom", "Google Classroom", "Academic workspace sync prepared for verified Google access.", "coming_soon"),
+  providerStub("notion", "Notion", "Knowledge sync prepared for a future update.", "coming_soon"),
   providerStub("slack", "Slack", "Send messages and get updates in Slack.", "coming_soon"),
   providerStub("microsoft-outlook", "Microsoft Outlook", "Sync emails, contacts and calendar.", "coming_soon"),
   providerStub("github", "GitHub", "Connect repos and track activity.", "coming_soon"),
@@ -63,7 +64,7 @@ export function IntegrationsPage() {
     const provider = params.get("integration")
     const status = params.get("status")
 
-    if (provider && status === "connected") {
+    if (provider && status === "connected" && liveProviders.has(provider)) {
       setSelectedId(provider)
       setOptimisticConnected((current) => new Set([...Array.from(current), provider]))
       setIntegrations((current) =>
@@ -174,7 +175,7 @@ export function IntegrationsPage() {
 
   const selected = allIntegrations.find((item) => item.id === selectedId) || allIntegrations[0]
   const connectedCount = allIntegrations.filter((item) => item.connected).length
-  const availableCount = allIntegrations.filter((item) => liveProviders.has(item.id) && !item.connected).length
+  const availableCount = allIntegrations.filter((item) => !item.connected).length
 
   const filtered = allIntegrations.filter((item) => {
     const matchesQuery = `${item.name} ${item.description}`.toLowerCase().includes(query.toLowerCase())
@@ -192,7 +193,7 @@ export function IntegrationsPage() {
           <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-4xl font-bold tracking-tight">Integrations</h1>
-              <p className="mt-2 text-muted-foreground">Connect your favorite tools and let CEASER work with everything you use.</p>
+              <p className="mt-2 text-muted-foreground">Google sign-in is active. Workspace integrations are prepared for verified access.</p>
             </div>
             <div className="flex gap-3">
               <label className="flex h-12 w-[360px] max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
@@ -209,7 +210,7 @@ export function IntegrationsPage() {
           <div className="mb-7 flex gap-7 border-b border-white/10 text-sm font-medium">
             <Tab label="All Integrations" active={filter === "all"} onClick={() => setFilter("all")} />
             <Tab label={`Connected (${connectedCount})`} active={filter === "connected"} onClick={() => setFilter("connected")} />
-            <Tab label={`Available (${availableCount})`} active={filter === "available"} onClick={() => setFilter("available")} />
+            <Tab label={`Prepared (${availableCount})`} active={filter === "available"} onClick={() => setFilter("available")} />
           </div>
 
           {message && <p className="mb-4 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">{message}</p>}
@@ -270,8 +271,8 @@ export function IntegrationsPage() {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className="rounded-xl bg-gradient-to-r from-blue-500 to-violet-600 px-5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                      {liveProviders.has(selected.id) ? "Connect" : "Future Update"}
+                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className="rounded-xl bg-white/10 px-5 py-2 text-sm font-semibold text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-80">
+                      Prepared
                     </button>
                   )}
                 </div>
@@ -377,7 +378,7 @@ function IntegrationLogo({ id, large = false }: { id: string; large?: boolean })
 
 function StatusPill({ integration }: { integration: IntegrationRecord }) {
   const live = liveProviders.has(integration.id)
-  const label = !live ? "Available" : integration.connected ? "Connected" : integration.status === "credentials_required" ? "Setup needed" : "Available"
+  const label = !live ? "Prepared" : integration.connected ? "Connected" : integration.status === "credentials_required" ? "Setup needed" : "Available"
   return (
     <span className={cn(
       "shrink-0 rounded-lg px-3 py-1 text-xs font-semibold",
@@ -419,6 +420,7 @@ function DetailRow({ icon, text, subtext }: { icon: ReactNode; text: string; sub
 }
 
 function permissionLabels(integration: IntegrationRecord) {
+  if (!liveProviders.has(integration.id)) return ["Verified access preparation", "Privacy review in progress", "Google sign-in remains active"]
   if (integration.id === "gmail") return ["Read emails", "Read labels", "Access profile info"]
   if (integration.id === "google-calendar") return ["Read calendars", "Read calendar events", "Access profile info"]
   if (integration.id === "google-drive") return ["Read Drive metadata", "Read supported document content", "Access profile info"]
@@ -428,6 +430,12 @@ function permissionLabels(integration: IntegrationRecord) {
 }
 
 function featureLabels(integration: IntegrationRecord) {
+  if (!liveProviders.has(integration.id)) {
+    return [
+      { title: "Launch Safe", detail: launchMessage, icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+      { title: "Account Identity", detail: "Google login continues with profile access only", icon: <Users className="h-3.5 w-3.5" /> },
+    ]
+  }
   if (integration.id === "gmail") {
     return [
       { title: "AI Email Assistant", detail: "Summaries and important inbox signals", icon: <Sparkles className="h-3.5 w-3.5" /> },

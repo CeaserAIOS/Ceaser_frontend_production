@@ -15,6 +15,19 @@ export interface AuthSession {
 }
 
 export const authApi = {
+  isDesktopLinkRequest: () => {
+    if (typeof window === "undefined") return false
+    const params = new URLSearchParams(window.location.search)
+    return window.location.protocol === "ceaser-app:" || params.get("desktop_link") === "1" || params.get("desktop") === "1"
+  },
+  completeDesktopLink: (session?: { access_token?: string | null; refresh_token?: string | null } | null) => {
+    if (typeof window === "undefined" || !session?.access_token) return false
+    const params = new URLSearchParams()
+    params.set("access_token", session.access_token)
+    if (session.refresh_token) params.set("refresh_token", session.refresh_token)
+    window.location.replace(`ceaser-app://bundle/auth/callback/#${params.toString()}`)
+    return true
+  },
   consumeOAuthRedirect: () => {
     if (typeof window === "undefined") return null
     const rawHash = window.location.hash.replace(/^#\/?/, "")
@@ -37,14 +50,14 @@ export const authApi = {
     if (!supabaseUrl || typeof window === "undefined") {
       throw new Error("Google login is not configured.")
     }
-    const isDesktop = window.location.protocol === "ceaser-app:"
+    const isDesktop = authApi.isDesktopLinkRequest()
     const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname)
     const appUrl = (isLocalhost
       ? `${window.location.origin}/console`
       : process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
     ).replace(/\/$/, "")
     const callbackUrl = isDesktop
-      ? "ceaser-app://bundle/auth/callback/"
+      ? `${appUrl}/auth/callback/?desktop_link=1`
       : `${appUrl}/auth/callback/`
     const redirectTo = encodeURIComponent(callbackUrl)
     window.location.href = `${supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`

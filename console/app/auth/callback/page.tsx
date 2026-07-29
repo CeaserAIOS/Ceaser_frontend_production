@@ -9,7 +9,8 @@ export default function AuthCallbackPage() {
       process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
     ).replace(/\/$/, "")
     try {
-      authApi.consumeOAuthRedirect()
+      const session = authApi.consumeOAuthRedirect()
+      if (authApi.isDesktopLinkRequest() && authApi.completeDesktopLink(session)) return
       window.location.replace(`${consoleUrl}/`)
     } catch {
       window.location.replace(`${consoleUrl}/?auth_error=oauth_callback`)

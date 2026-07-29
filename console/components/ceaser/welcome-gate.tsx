@@ -165,6 +165,10 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       }
       setSession(next)
       const signedInEmail = sessionEmail(next) || email.trim()
+      if (authApi.isDesktopLinkRequest() && authApi.completeDesktopLink(next)) {
+        setMessage("Account connected. Returning to CEASER Desktop...")
+        return
+      }
       setEmail(signedInEmail)
       if (authMode === "login") {
         setCurrentPage("mission-control")

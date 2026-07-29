@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
-import { draftsApi, type DraftRecord } from "@/lib/api/drafts"
+import { draftsApi, type DraftRecord, type DraftSection } from "@/lib/api/drafts"
 import { documentsApi, type GeneratedDocument } from "@/lib/api/documents"
 import { agents } from "@/lib/data"
 import { useApp } from "@/lib/app-context"
@@ -157,64 +157,77 @@ export function DraftsPage() {
 }
 
 function draftOutline(draft: DraftRecord): string[] {
-  const content = draft.content
-  if (content.slides?.length) return content.slides.map((slide) => slide.title)
-  if (content.key_findings?.length) return content.key_findings.map((finding) => finding.finding)
-  if (content.modules?.length) return content.modules.map((module) => module.name)
-  if (content.calendar_items?.length) return content.calendar_items.map((item) => `${item.date ?? "Date"} - ${item.platform ?? "Platform"}`)
-  if (content.daily_plan?.length) return content.daily_plan.map((day) => `${day.day}: ${day.focus}`)
-  if (content.milestones?.length) return content.milestones.map((milestone) => milestone.name)
-  if (content.sections?.length) return content.sections.map((section) => "title" in section ? section.title : section.heading ?? "Section")
+  const content = workflowContent(draft.content)
+  const slides = asArray<{ title?: string }>(content.slides)
+  const keyFindings = asArray<{ finding?: string }>(content.key_findings)
+  const modules = asArray<{ name?: string }>(content.modules)
+  const calendarItems = asArray<Record<string, string>>(content.calendar_items)
+  const dailyPlan = asArray<{ day?: string; focus?: string }>(content.daily_plan)
+  const milestones = asArray<{ name?: string }>(content.milestones)
+  const sections = asArray<DraftSection | { title?: string; heading?: string }>(content.sections)
+  if (slides.length) return slides.map((slide) => slide.title || "Slide")
+  if (keyFindings.length) return keyFindings.map((finding) => finding.finding || "Finding")
+  if (modules.length) return modules.map((module) => module.name || "Module")
+  if (calendarItems.length) return calendarItems.map((item) => `${item.date ?? "Date"} - ${item.platform ?? "Platform"}`)
+  if (dailyPlan.length) return dailyPlan.map((day) => `${day.day ?? "Day"}: ${day.focus ?? "Focus"}`)
+  if (milestones.length) return milestones.map((milestone) => milestone.name || "Milestone")
+  if (sections.length) return sections.map((section) => "title" in section ? section.title || "Section" : section.heading ?? "Section")
   return [draft.title]
 }
 
 function DraftPreview({ draft }: { draft: DraftRecord }) {
-  const content = draft.content
-  if (content.slides?.length) {
+  const content = workflowContent(draft.content)
+  const slides = asArray<{ slide_number?: number; title?: string; purpose?: string; bullets?: string[]; visual_suggestion?: string; speaker_notes?: string }>(content.slides)
+  const keyFindings = asArray<{ finding?: string; evidence?: string }>(content.key_findings)
+  const modules = asArray<{ name?: string; purpose?: string; responsibilities?: string[] }>(content.modules)
+  const calendarItems = asArray<Record<string, string>>(content.calendar_items)
+  const dailyPlan = asArray<{ day?: string; focus?: string; tasks?: string[] }>(content.daily_plan)
+  const milestones = asArray<{ name?: string; tasks?: string[]; priority?: string; deadline?: string }>(content.milestones)
+  if (slides.length) {
     return (
       <div className="space-y-3">
-        {content.slides.map((slide) => (
-          <section key={slide.slide_number} className="rounded-lg border border-border bg-background/50 p-4">
-            <p className="text-xs text-primary">Slide {slide.slide_number}</p>
-            <h3 className="mt-1 font-semibold">{slide.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{slide.purpose}</p>
+        {slides.map((slide, index) => (
+          <section key={`${slide.slide_number ?? index}-${slide.title ?? "slide"}`} className="rounded-lg border border-border bg-background/50 p-4">
+            <p className="text-xs text-primary">Slide {slide.slide_number ?? index + 1}</p>
+            <h3 className="mt-1 font-semibold">{slide.title ?? "Untitled slide"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{slide.purpose ?? "No purpose added."}</p>
             <ul className="mt-3 space-y-1 text-sm">
-              {slide.bullets.map((bullet) => <li key={bullet}>- {bullet}</li>)}
+              {asArray<string>(slide.bullets).map((bullet) => <li key={bullet}>- {bullet}</li>)}
             </ul>
-            <p className="mt-3 text-xs text-muted-foreground"><span className="text-foreground">Visual:</span> {slide.visual_suggestion}</p>
-            <p className="mt-1 text-xs text-muted-foreground"><span className="text-foreground">Speaker notes:</span> {slide.speaker_notes}</p>
+            <p className="mt-3 text-xs text-muted-foreground"><span className="text-foreground">Visual:</span> {slide.visual_suggestion ?? "Not specified"}</p>
+            <p className="mt-1 text-xs text-muted-foreground"><span className="text-foreground">Speaker notes:</span> {slide.speaker_notes ?? "Not specified"}</p>
           </section>
         ))}
       </div>
     )
   }
-  if (content.key_findings?.length) {
+  if (keyFindings.length) {
     return (
       <div className="space-y-3">
         {typeof content.executive_summary === "string" && <p className="rounded-lg border border-border bg-background/50 p-4 text-sm text-muted-foreground">{content.executive_summary}</p>}
-        {content.key_findings.map((finding) => (
-          <section key={finding.finding} className="rounded-lg border border-border bg-background/50 p-4">
-            <h3 className="font-semibold">{finding.finding}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{finding.evidence}</p>
+        {keyFindings.map((finding, index) => (
+          <section key={`${finding.finding ?? "finding"}-${index}`} className="rounded-lg border border-border bg-background/50 p-4">
+            <h3 className="font-semibold">{finding.finding ?? "Finding"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{finding.evidence ?? "No evidence added."}</p>
           </section>
         ))}
       </div>
     )
   }
-  if (content.modules?.length) {
+  if (modules.length) {
     return (
       <div className="space-y-3">
-        {content.modules.map((module) => (
-          <section key={module.name} className="rounded-lg border border-border bg-background/50 p-4">
-            <h3 className="font-semibold">{module.name}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{module.purpose}</p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{(module.responsibilities ?? []).map((item) => <li key={item}>- {item}</li>)}</ul>
+        {modules.map((module, index) => (
+          <section key={`${module.name ?? "module"}-${index}`} className="rounded-lg border border-border bg-background/50 p-4">
+            <h3 className="font-semibold">{module.name ?? "Module"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{module.purpose ?? "No purpose added."}</p>
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{asArray<string>(module.responsibilities).map((item) => <li key={item}>- {item}</li>)}</ul>
           </section>
         ))}
       </div>
     )
   }
-  if (content.calendar_items?.length) {
+  if (calendarItems.length) {
     return (
       <div className="overflow-hidden rounded-lg border border-border">
         <table className="w-full text-left text-sm">
@@ -227,7 +240,7 @@ function DraftPreview({ draft }: { draft: DraftRecord }) {
             </tr>
           </thead>
           <tbody>
-            {content.calendar_items.map((item, index) => (
+            {calendarItems.map((item, index) => (
               <tr key={`${item.date}-${item.topic}-${index}`} className="border-t border-border">
                 <td className="px-3 py-2 text-muted-foreground">{item.date ?? "TBD"}</td>
                 <td className="px-3 py-2">{item.platform ?? "Channel"}</td>
@@ -240,27 +253,27 @@ function DraftPreview({ draft }: { draft: DraftRecord }) {
       </div>
     )
   }
-  if (content.daily_plan?.length) {
+  if (dailyPlan.length) {
     return (
       <div className="space-y-3">
-        {content.daily_plan.map((day) => (
-          <section key={`${day.day}-${day.focus}`} className="rounded-lg border border-border bg-background/50 p-4">
-            <p className="text-xs text-primary">{day.day}</p>
-            <h3 className="mt-1 font-semibold">{day.focus}</h3>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{(day.tasks ?? []).map((task) => <li key={task}>- {task}</li>)}</ul>
+        {dailyPlan.map((day, index) => (
+          <section key={`${day.day ?? "day"}-${day.focus ?? index}`} className="rounded-lg border border-border bg-background/50 p-4">
+            <p className="text-xs text-primary">{day.day ?? `Day ${index + 1}`}</p>
+            <h3 className="mt-1 font-semibold">{day.focus ?? "Focus"}</h3>
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{asArray<string>(day.tasks).map((task) => <li key={task}>- {task}</li>)}</ul>
           </section>
         ))}
       </div>
     )
   }
-  if (content.milestones?.length) {
+  if (milestones.length) {
     return (
       <div className="grid gap-3 md:grid-cols-2">
-        {content.milestones.map((milestone) => (
-          <section key={milestone.name} className="rounded-lg border border-border bg-background/50 p-4">
-            <h3 className="font-semibold">{milestone.name}</h3>
+        {milestones.map((milestone, index) => (
+          <section key={`${milestone.name ?? "milestone"}-${index}`} className="rounded-lg border border-border bg-background/50 p-4">
+            <h3 className="font-semibold">{milestone.name ?? "Milestone"}</h3>
             <p className="mt-1 text-xs text-muted-foreground">Priority: {milestone.priority ?? "medium"} / Deadline: {milestone.deadline ?? "TBD"}</p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{milestone.tasks.map((task) => <li key={task}>- {task}</li>)}</ul>
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{asArray<string>(milestone.tasks).map((task) => <li key={task}>- {task}</li>)}</ul>
           </section>
         ))}
       </div>
@@ -310,4 +323,12 @@ function renderValue(value: unknown): ReactNode {
     )
   }
   return <p>{String(value)}</p>
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
+}
+
+function workflowContent(content: DraftRecord["content"] | null | undefined): DraftRecord["content"] {
+  return content && typeof content === "object" ? content : { title: "Workflow", type: "workflow", owner_agent: "ceaser" }
 }

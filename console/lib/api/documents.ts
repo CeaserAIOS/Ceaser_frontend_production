@@ -1,4 +1,4 @@
-import { apiRequest } from "./client"
+import { apiRequest, invalidateApiCache } from "./client"
 
 export type DocumentKind = "pptx" | "docx" | "xlsx" | "pdf"
 
@@ -47,7 +47,10 @@ export const documentsApi = {
     return apiRequest<GeneratedDocument[]>(`/documents${query.toString() ? `?${query}` : ""}`)
   },
   create: (payload: { kind: DocumentKind; prompt: string; template_id?: string | null; agent_id?: string | null; source_content?: string | null }) =>
-    apiRequest<{ document: GeneratedDocument; file: Record<string, unknown>; preview: string }>("/documents", { method: "POST", body: payload }),
+    apiRequest<{ document: GeneratedDocument; file: Record<string, unknown>; preview: string }>("/documents", { method: "POST", body: payload }).then((response) => {
+      invalidateApiCache(["/documents", "/files", "/projects", "/memories"])
+      return response
+    }),
   export: (documentId: string) =>
     apiRequest<{ downloadUrl: string; file_id: string }>(`/documents/${documentId}/export`, { method: "POST" }),
   agentWorkbench: (agentId: string) =>

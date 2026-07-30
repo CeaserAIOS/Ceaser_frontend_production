@@ -84,6 +84,12 @@ const documentCreatedMessage = (request: DocumentRequest, fileName?: string | nu
     "You can find it in Files. Use the file actions there to download, review, summarize, or ask CEASER about it.",
   ].filter((line): line is string => line !== null).join("\n")
 
+const isDocumentCreatedNotice = (message: Message) =>
+  /^document created\b/i.test(message.content.trim()) || /CEASER created a real (?:Word|PDF|PowerPoint|Excel) document/i.test(message.content)
+
+const refersToPreviousAnswer = (message: string) =>
+  /\b(?:on|from|based on|using|turn)\s+(?:it|this|that|the (?:previous|above) (?:answer|response|content))\b|\b(?:previous|above) (?:answer|response|content)\b/i.test(message)
+
 const formatTime = (value?: string) => {
   const date = value ? new Date(value) : new Date()
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -572,7 +578,9 @@ export function ChatPage() {
     if (!content || (isLoading && !forceNewStream)) return
     cancelActiveStream()
     const documentRequest = detectDocumentRequest(content)
-    const sourceAnswer = documentRequest ? [...messages].reverse().find((message) => message.role === "assistant" && !message.isTyping && message.content.trim()) : undefined
+    const sourceAnswer = documentRequest && refersToPreviousAnswer(content)
+      ? [...messages].reverse().find((message) => message.role === "assistant" && !message.isTyping && message.content.trim() && !isDocumentCreatedNotice(message))
+      : undefined
     const sourcePrompt = documentRequest ? [...messages].reverse().find((message) => message.role === "user" && message.content.trim())?.content : undefined
     setInput("")
     setIsLoading(true)
@@ -590,7 +598,11 @@ export function ChatPage() {
       timestamp: formatTime(),
       isTyping: true,
       isStreaming: true,
-      statusLabel: documentRequest && sourceAnswer ? `Creating your ${documentRequest.label} from the previous answer… usually under 10 seconds.` : undefined,
+      statusLabel: documentRequest
+        ? sourceAnswer
+          ? `Creating your ${documentRequest.label} from the previous answer... usually under 10 seconds.`
+          : `Generating your ${documentRequest.label}...`
+        : undefined,
     }
     setMessages((current) => [...current, userMessage, typingMessage])
 
@@ -599,14 +611,14 @@ export function ChatPage() {
       conversationId = await ensureConversation()
       const seededMessages = [...messages, userMessage, typingMessage]
       conversationCacheRef.current.set(conversationId, seededMessages)
-      if (documentRequest && sourceAnswer) {
+      if (documentRequest) {
         const startedAt = performance.now()
         await chatApi.sendMessage(conversationId, content, "user")
         const generated = await documentsApi.create({
           kind: documentRequest.kind,
-          prompt: sourcePrompt ? `Create a document about ${sourcePrompt}` : content,
+          prompt: sourceAnswer && sourcePrompt ? `Create a document about ${sourcePrompt}` : content,
           agent_id: documentRequest.agentId,
-          source_content: sourceAnswer.content.slice(0, 50000),
+          source_content: sourceAnswer?.content.slice(0, 50000),
         })
         const generatedContent = documentCreatedMessage(documentRequest, generated.document.file_name, performance.now() - startedAt)
         const generatedRecord = await chatApi.sendMessage(conversationId, generatedContent, "assistant", {
@@ -694,32 +706,6 @@ export function ChatPage() {
         if (conversationId) conversationCacheRef.current.set(conversationId, next)
         return next
       })
-      if (documentRequest) {
-        const generated = await documentsApi.create({
-          kind: documentRequest.kind,
-          prompt: content,
-          agent_id: documentRequest.agentId,
-        })
-        const generatedContent = documentCreatedMessage(documentRequest, generated.document.file_name)
-        const generatedRecord = await chatApi.sendMessage(conversationId, generatedContent, "assistant", {
-          generated_document: generated.document,
-          generated_file: generated.file,
-          preview: generated.preview,
-        })
-        const generatedMessage: Message = {
-          id: generatedRecord.id,
-          role: "assistant",
-          content: generatedRecord.content,
-          timestamp: formatTime(generatedRecord.created_at),
-          metadata: metadataFromRecord(generatedRecord),
-          ...richMessageFields(generatedRecord),
-        }
-        setMessages((current) => {
-          const next = current.concat(generatedMessage)
-          if (conversationId) conversationCacheRef.current.set(conversationId, next)
-          return next
-        })
-      }
       setAttachedFiles([])
       void refreshConversationList()
       window.dispatchEvent(new Event("ceaser:activity-updated"))

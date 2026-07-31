@@ -63,6 +63,7 @@ export function FilesPage() {
   const [activeFilter, setActiveFilter] = useState<FileFilter>("all")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [activeAction, setActiveAction] = useState<DocumentAction | "question" | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -104,16 +105,23 @@ export function FilesPage() {
   useEffect(() => {
     const boot = async () => {
       setIsLoading(true)
+      setLoadError(null)
       try {
-        const records = await filesApi.list()
-        const draftRecords = await draftsApi.list()
-        const projectRecords = await projectsApi.list()
-        const memoryRecords = await memoryApi.list()
+        // These sources do not depend on one another. Fetch them together so
+        // a slow draft or memory request does not block the file library.
+        const [records, draftRecords, projectRecords, memoryRecords] = await Promise.all([
+          filesApi.list(),
+          draftsApi.list(),
+          projectsApi.list(),
+          memoryApi.list(),
+        ])
         setFiles(records)
         setDrafts(draftRecords)
         setProjects(projectRecords)
         setMemories(memoryRecords)
-      if (records[0]) setSelectedFile(await filesApi.get(records[0].id))
+        if (records[0]) setSelectedFile(await filesApi.get(records[0].id))
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Files could not be loaded. Please try again.")
       } finally {
         setIsLoading(false)
       }
@@ -285,6 +293,10 @@ export function FilesPage() {
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="py-8 text-center text-sm text-muted-foreground">Loading files...</div>
+            ) : loadError ? (
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-center text-sm text-amber-100">
+                {loadError}
+              </div>
             ) : filteredFiles.length ? filteredFiles.map((file) => (
               <div key={file.id} className={cn("group flex w-full items-center gap-2 rounded-xl border p-2 transition-all", selectedFile?.id === file.id ? "border-primary bg-primary/12 shadow-[0_0_35px_rgba(79,140,255,0.16)]" : "border-border bg-background/30 hover:border-primary/40 hover:bg-primary/5")}>
                 <button onClick={() => void handleView(file)} className="flex min-w-0 flex-1 gap-3 rounded-lg p-1 text-left">

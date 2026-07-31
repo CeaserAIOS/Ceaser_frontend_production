@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { CeaserLogo } from "../ceaser-logo"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, FileText, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -27,6 +27,7 @@ interface Message {
   contributionSummary?: string
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
+  documentRequest?: DocumentRequest
   isTyping?: boolean
   isStreaming?: boolean
   statusLabel?: string
@@ -68,27 +69,19 @@ const detectDocumentRequest = (message: string): DocumentRequest | null => {
   if (/\b(excel|spreadsheet|sheet|tracker|xlsx|table)\b/.test(normalized)) return { kind: "xlsx", label: "Excel sheet", agentId: "bolt" }
   if (/\b(pdf)\b/.test(normalized)) return { kind: "pdf", label: "PDF document", agentId: "friday" }
   if (/\b(document|doc|docx|report|business plan|proposal|brief|article|essay|writeup|write-up|marketing plan|startup plan)\b/.test(normalized)) {
-    const agentId = /\b(business plan|startup plan|strategy|revenue|growth|investor)\b/.test(normalized) ? "zeus" : "friday"
+    const agentId = /\b(report)\b/.test(normalized)
+      ? /\b(research|market|competitor|source|citation)\b/.test(normalized)
+        ? "nova"
+        : /\b(business|startup|strategy|revenue|growth|investor)\b/.test(normalized)
+          ? "zeus"
+          : "atlas"
+      : /\b(business plan|startup plan|strategy|revenue|growth|investor)\b/.test(normalized)
+        ? "zeus"
+        : "friday"
     return { kind: "docx", label: "Word document", agentId }
   }
   return null
 }
-
-const documentCreatedMessage = (request: DocumentRequest, fileName?: string | null, elapsedMs?: number) =>
-  [
-    "Document Created",
-    "",
-    `CEASER created a real ${request.label}${fileName ? `: ${fileName}` : ""}.`,
-    elapsedMs !== undefined ? `Created in ${(elapsedMs / 1000).toFixed(1)} seconds.` : null,
-    "",
-    "You can find it in Files. Use the file actions there to download, review, summarize, or ask CEASER about it.",
-  ].filter((line): line is string => line !== null).join("\n")
-
-const isDocumentCreatedNotice = (message: Message) =>
-  /^document created\b/i.test(message.content.trim()) || /CEASER created a real (?:Word|PDF|PowerPoint|Excel) document/i.test(message.content)
-
-const refersToPreviousAnswer = (message: string) =>
-  /\b(?:on|from|based on|using|turn)\s+(?:it|this|that|the (?:previous|above) (?:answer|response|content))\b|\b(?:previous|above) (?:answer|response|content)\b/i.test(message)
 
 const formatTime = (value?: string) => {
   const date = value ? new Date(value) : new Date()
@@ -226,7 +219,8 @@ export function ChatPage() {
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isConversationLoading, setIsConversationLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const shouldFollowStreamRef = useRef(true)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const chatComposerRef = useRef<HTMLInputElement>(null)
   const preferredConversationRef = useRef<string | null>(null)
@@ -238,6 +232,12 @@ export function ChatPage() {
   const streamAbortRef = useRef<AbortController | null>(null)
   const streamSessionRef = useRef(0)
   const autoSendSeedRef = useRef(false)
+
+  const captureScrollPosition = useCallback(() => {
+    const container = chatScrollRef.current
+    if (!container) return
+    shouldFollowStreamRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+  }, [])
 
   const latestAssistantIntel = useMemo(
     () => [...messages].reverse().find((message) => message.role === "assistant" && (message.workflow || message.research || message.memoriesUsed?.length || message.contributions?.length)),
@@ -317,23 +317,6 @@ export function ChatPage() {
         const records = await chatApi.listConversations(showArchivedChats)
         setConversations(records)
         setLoadError(null)
-        for (const conversation of records.slice(0, 5)) {
-          if (conversationCacheRef.current.has(conversation.id) || conversationRequestCacheRef.current.has(conversation.id)) continue
-          const preload = chatApi
-            .listMessages(conversation.id, 24)
-            .then((messages) => messages.map(normalizeMessage))
-            .then((normalized) => {
-              if (!conversationCacheRef.current.has(conversation.id)) {
-                conversationCacheRef.current.set(conversation.id, normalized)
-              }
-              return normalized
-            })
-            .catch(() => [])
-            .finally(() => {
-              conversationRequestCacheRef.current.delete(conversation.id)
-            })
-          conversationRequestCacheRef.current.set(conversation.id, preload)
-        }
         return records
       } catch (error) {
         setConversations([])
@@ -388,7 +371,9 @@ export function ChatPage() {
   }, [loadConversations])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const container = chatScrollRef.current
+    if (!container || !shouldFollowStreamRef.current) return
+    container.scrollTop = container.scrollHeight
   }, [messages])
 
   useEffect(() => {
@@ -578,10 +563,9 @@ export function ChatPage() {
     if (!content || (isLoading && !forceNewStream)) return
     cancelActiveStream()
     const documentRequest = detectDocumentRequest(content)
-    const sourceAnswer = documentRequest && refersToPreviousAnswer(content)
-      ? [...messages].reverse().find((message) => message.role === "assistant" && !message.isTyping && message.content.trim() && !isDocumentCreatedNotice(message))
-      : undefined
-    const sourcePrompt = documentRequest ? [...messages].reverse().find((message) => message.role === "user" && message.content.trim())?.content : undefined
+    // A newly sent message should be visible, but once the user scrolls up we
+    // keep their reading position stable while streamed chunks arrive.
+    shouldFollowStreamRef.current = true
     setInput("")
     setIsLoading(true)
 
@@ -598,11 +582,6 @@ export function ChatPage() {
       timestamp: formatTime(),
       isTyping: true,
       isStreaming: true,
-      statusLabel: documentRequest
-        ? sourceAnswer
-          ? `Creating your ${documentRequest.label} from the previous answer... usually under 10 seconds.`
-          : `Generating your ${documentRequest.label}...`
-        : undefined,
     }
     setMessages((current) => [...current, userMessage, typingMessage])
 
@@ -611,51 +590,36 @@ export function ChatPage() {
       conversationId = await ensureConversation()
       const seededMessages = [...messages, userMessage, typingMessage]
       conversationCacheRef.current.set(conversationId, seededMessages)
-      if (documentRequest) {
-        const startedAt = performance.now()
-        await chatApi.sendMessage(conversationId, content, "user")
-        const generated = await documentsApi.create({
-          kind: documentRequest.kind,
-          prompt: sourceAnswer && sourcePrompt ? `Create a document about ${sourcePrompt}` : content,
-          agent_id: documentRequest.agentId,
-          source_content: sourceAnswer?.content.slice(0, 50000),
-        })
-        const generatedContent = documentCreatedMessage(documentRequest, generated.document.file_name, performance.now() - startedAt)
-        const generatedRecord = await chatApi.sendMessage(conversationId, generatedContent, "assistant", {
-          generated_document: generated.document,
-          generated_file: generated.file,
-          preview: generated.preview,
-        })
-        const generatedMessage: Message = {
-          id: generatedRecord.id,
-          role: "assistant",
-          content: generatedRecord.content,
-          timestamp: formatTime(generatedRecord.created_at),
-          metadata: metadataFromRecord(generatedRecord),
-          ...richMessageFields(generatedRecord),
-        }
-        setMessages((current) => {
-          const next = current.map((message) => (message.id === typingMessage.id ? generatedMessage : message))
-          if (conversationId) conversationCacheRef.current.set(conversationId, next)
-          return next
-        })
-        setAttachedFiles([])
-        void refreshConversationList()
-        window.dispatchEvent(new Event("ceaser:activity-updated"))
-        return
-      }
       const fileIds = attachedFiles.map((file) => file.id)
       const controller = new AbortController()
       streamAbortRef.current = controller
       const streamSessionId = ++streamSessionRef.current
+      const clientStreamStartedAt = performance.now()
+      let firstTokenAt: number | null = null
       let response: CeaserChatResponse | null = null
       let streamedContent = ""
       let receivedStreamContent = false
       try {
         let streamError: string | null = null
         await chatApi.sendCeaserMessageStream(content, conversationId, fileIds, {
+          onStatus: (payload) => {
+            if (streamSessionRef.current !== streamSessionId) return
+            const state = String(payload.state || "")
+            const labels: Record<string, string> = {
+              received: "Request received…",
+              understanding_request: "Understanding your request…",
+              retrieving_context: "Gathering relevant context…",
+              generating: "Writing response…",
+            }
+            setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, statusLabel: labels[state] || "Working…" } : message))
+          },
           onToken: (text) => {
             if (streamSessionRef.current !== streamSessionId) return
+            captureScrollPosition()
+            if (firstTokenAt === null) {
+              firstTokenAt = performance.now()
+              console.info("[CEASER LATENCY] frontend_first_token_ms", Math.round(firstTokenAt - clientStreamStartedAt))
+            }
             streamedContent += text
             receivedStreamContent = true
             setMessages((current) =>
@@ -668,6 +632,9 @@ export function ChatPage() {
           },
           onComplete: (streamedResponse) => {
             if (streamSessionRef.current !== streamSessionId) return
+            console.info(
+              `[CEASER LLM] provider=${String(streamedResponse.context_summary?.provider ?? "not reported")} model=${String(streamedResponse.context_summary?.model ?? "not reported")} fallback_used=${String(streamedResponse.context_summary?.fallback_used ?? false)} agents=${streamedResponse.selected_agents.join(",") || "none"}`,
+            )
             response = streamedResponse
           },
           onError: (message) => {
@@ -700,11 +667,14 @@ export function ChatPage() {
         }
       }
       if (!response) throw new Error("We couldn't complete your request. Please try again.")
-      const assistantMessage = responseToMessage(typingMessage.id, response)
+      const assistantMessage = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
       setMessages((current) => {
         const next = current.map((message) => (message.id === typingMessage.id ? { ...assistantMessage, isTyping: false, isStreaming: false } : message))
         if (conversationId) conversationCacheRef.current.set(conversationId, next)
         return next
+      })
+      requestAnimationFrame(() => {
+        console.info("[CEASER LATENCY] frontend_render_ms", Math.round(performance.now() - clientStreamStartedAt), "first_token_ms", firstTokenAt === null ? null : Math.round(firstTokenAt - clientStreamStartedAt))
       })
       setAttachedFiles([])
       void refreshConversationList()
@@ -994,7 +964,11 @@ export function ChatPage() {
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6">
-          <div className={cn("min-h-0 flex-1 overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[17vh]")}>
+          <div
+            ref={chatScrollRef}
+            onScroll={captureScrollPosition}
+            className={cn("min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[17vh]")}
+          >
             {loadError && (
               <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                 {loadError}
@@ -1050,7 +1024,6 @@ export function ChatPage() {
                     />
                   ))
                 )}
-                <div ref={messagesEndRef} />
               </div>
             )}
           </div>
@@ -1132,6 +1105,132 @@ function findPreviousUserPrompt(messages: Message[], assistantIndex: number) {
   return ""
 }
 
+type ProjectReport = Record<string, unknown> & { type: "project_report"; title?: string }
+
+function parseProjectReport(content: string): ProjectReport | null {
+  const candidate = content.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim()
+  try {
+    const parsed = JSON.parse(candidate) as Record<string, unknown>
+    return parsed.type === "project_report" ? parsed as ProjectReport : null
+  } catch {
+    return null
+  }
+}
+
+const reportText = (value: unknown) => typeof value === "string" ? value : ""
+const reportList = (value: unknown) => Array.isArray(value) ? value.map((item) => typeof item === "string" ? item : reportText((item as Record<string, unknown>)?.task || (item as Record<string, unknown>)?.name)).filter(Boolean) : []
+
+function ProjectReportCard({ report }: { report: ProjectReport }) {
+  const requirements = report.key_requirements as Record<string, unknown> | undefined
+  const scope = report.scope as Record<string, unknown> | undefined
+  const components = report.components as Record<string, unknown> | undefined
+  const implementation = Array.isArray(report.implementation) ? report.implementation as Array<Record<string, unknown>> : []
+  const risks = Array.isArray(report.risks) ? report.risks as Array<Record<string, unknown>> : []
+  const sections = [
+    ["Objectives", reportList(report.objective)],
+    ["Functional requirements", reportList(requirements?.functional)],
+    ["Non-functional requirements", reportList(requirements?.non_functional)],
+    ["In scope", reportList(scope?.in_scope)],
+    ["Out of scope", reportList(scope?.out_of_scope)],
+    ["Next steps", reportList(report.next_steps)],
+  ] as const
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/[0.08] via-slate-950/40 to-violet-500/[0.08]">
+      <header className="border-b border-white/10 px-5 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">CEASER · Project report</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">{reportText(report.title) || "Project Report"}</h2>
+        {reportText(report.executive_summary) && <p className="mt-3 text-sm leading-6 text-white/72">{reportText(report.executive_summary)}</p>}
+      </header>
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        {reportText(report.context) && <ReportPanel title="Context"><p>{reportText(report.context)}</p></ReportPanel>}
+        {reportText(report.proposed_solution) && <ReportPanel title="Proposed solution"><p>{reportText(report.proposed_solution)}</p></ReportPanel>}
+        {sections.filter(([, items]) => items.length).map(([title, items]) => <ReportPanel key={title} title={title}><ReportBullets items={items} /></ReportPanel>)}
+      </div>
+      {reportList(report.system_workflow).length > 0 && (
+        <div className="border-y border-white/10 px-4 py-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">System / workflow</p>
+          <div className="flex flex-wrap items-center gap-2">{reportList(report.system_workflow).map((step, index) => <span key={`${step}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-3 py-1.5 text-xs text-cyan-50">{step}{index < reportList(report.system_workflow).length - 1 && <span className="text-cyan-300">→</span>}</span>)}</div>
+        </div>
+      )}
+      {implementation.length > 0 && <div className="p-4"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Implementation plan</p><div className="space-y-2">{implementation.map((phase, index) => <div key={`${reportText(phase.phase)}-${index}`} className="rounded-xl border border-white/10 bg-black/15 p-3"><p className="font-medium text-white">{reportText(phase.phase) || `Phase ${index + 1}`}</p><p className="mt-1 text-xs text-white/55">{reportText(phase.objective) || "Requires confirmation"}</p><ReportBullets items={reportList(phase.tasks)} /></div>)}</div></div>}
+      {(components || risks.length > 0 || reportText(report.expected_outcome)) && <div className="grid gap-3 border-t border-white/10 p-4 md:grid-cols-2">
+        {components && <ReportPanel title="Components / resources"><ReportBullets items={Object.values(components).flatMap(reportList)} /></ReportPanel>}
+        {risks.length > 0 && <ReportPanel title="Risks & constraints"><ReportBullets items={risks.map((risk) => `${reportText(risk.risk) || "Risk requires confirmation"}${reportText(risk.mitigation) ? ` — Mitigation: ${reportText(risk.mitigation)}` : ""}`)} /></ReportPanel>}
+        {reportText(report.expected_outcome) && <ReportPanel title="Expected outcome"><p>{reportText(report.expected_outcome)}</p></ReportPanel>}
+      </div>}
+    </section>
+  )
+}
+
+function ReportPanel({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm leading-6 text-white/70"><p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{title}</p>{children}</section>
+}
+
+function ReportBullets({ items }: { items: string[] }) {
+  return <ul className="space-y-1.5">{items.map((item, index) => <li key={`${item}-${index}`} className="flex gap-2"><span className="text-cyan-300">•</span><span>{item}</span></li>)}</ul>
+}
+
+type FridayStructuredResponse = {
+  type: string
+  title: string
+  summary: string
+  sections: Array<{ title: string; description: string; items: unknown[] }>
+  actions: unknown[]
+  next_steps: unknown[]
+  warnings: unknown[]
+}
+
+function parseFridayStructuredResponse(content: string): FridayStructuredResponse | null {
+  try {
+    const value = JSON.parse(content) as Partial<FridayStructuredResponse>
+    if (!value || typeof value !== "object" || typeof value.title !== "string" || !Array.isArray(value.sections)) return null
+    return {
+      type: typeof value.type === "string" ? value.type : "answer",
+      title: value.title,
+      summary: typeof value.summary === "string" ? value.summary : "",
+      sections: value.sections.filter((section): section is { title: string; description: string; items: unknown[] } => Boolean(section) && typeof section.title === "string").map((section) => ({ title: section.title, description: typeof section.description === "string" ? section.description : "", items: Array.isArray(section.items) ? section.items : [] })),
+      actions: Array.isArray(value.actions) ? value.actions : [],
+      next_steps: Array.isArray(value.next_steps) ? value.next_steps : [],
+      warnings: Array.isArray(value.warnings) ? value.warnings : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+function structuredItemText(item: unknown): string {
+  if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") return String(item)
+  if (!item || typeof item !== "object" || Array.isArray(item)) return ""
+  const preferred = ["phase", "name", "task", "title", "description", "objective", "status", "owner", "priority", "dependency", "risk", "impact", "mitigation", "deliverable"]
+  const record = item as Record<string, unknown>
+  const entries = preferred.filter((key) => record[key] !== undefined && record[key] !== "").map((key) => `${key.replace(/_/g, " ")}: ${typeof record[key] === "string" ? record[key] : JSON.stringify(record[key])}`)
+  return entries.length ? entries.join(" · ") : Object.entries(record).filter(([, value]) => typeof value === "string" || typeof value === "number" || typeof value === "boolean").map(([key, value]) => `${key.replace(/_/g, " ")}: ${value}`).join(" · ")
+}
+
+function StructuredResponseCard({ response }: { response: FridayStructuredResponse }) {
+  const list = (items: unknown[]) => items.map(structuredItemText).filter(Boolean)
+  return (
+    <section className="overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/[0.08] via-slate-950/45 to-violet-500/[0.08]">
+      <header className="border-b border-white/10 px-5 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Friday · {response.type.replace(/_/g, " ")}</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">{response.title}</h2>
+        {response.summary && <p className="mt-2 text-sm leading-6 text-white/70">{response.summary}</p>}
+      </header>
+      {response.sections.length > 0 && <div className="grid gap-3 p-4 md:grid-cols-2">{response.sections.map((section, index) => <section key={`${section.title}-${index}`} className="rounded-xl border border-white/10 bg-black/15 p-3"><h3 className="font-medium text-white">{section.title}</h3>{section.description && <p className="mt-1 text-xs leading-5 text-white/55">{section.description}</p>}{list(section.items).length > 0 && <ul className="mt-3 space-y-2 text-sm text-white/75">{list(section.items).map((item, itemIndex) => <li key={`${item}-${itemIndex}`} className="flex gap-2"><span className="text-cyan-300">•</span><span>{item}</span></li>)}</ul>}</section>)}</div>}
+      {(response.actions.length > 0 || response.next_steps.length > 0 || response.warnings.length > 0) && <div className="grid gap-3 border-t border-white/10 p-4 md:grid-cols-3">
+        {response.actions.length > 0 && <StructuredList title="Actions" items={list(response.actions)} />}
+        {response.next_steps.length > 0 && <StructuredList title="Next steps" items={list(response.next_steps)} />}
+        {response.warnings.length > 0 && <StructuredList title="Requires confirmation" items={list(response.warnings)} tone="amber" />}
+      </div>}
+    </section>
+  )
+}
+
+function StructuredList({ title, items, tone = "cyan" }: { title: string; items: string[]; tone?: "cyan" | "amber" }) {
+  return <section className="rounded-xl border border-white/10 bg-black/15 p-3"><p className={cn("text-xs font-semibold uppercase tracking-[0.14em]", tone === "amber" ? "text-amber-200" : "text-cyan-200")}>{title}</p><ul className="mt-2 space-y-1.5 text-sm text-white/70">{items.map((item, index) => <li key={`${item}-${index}`} className="flex gap-2"><span className={tone === "amber" ? "text-amber-300" : "text-cyan-300"}>•</span><span>{item}</span></li>)}</ul></section>
+}
+
 function ChatBubble({
   message,
   previousUserPrompt,
@@ -1161,7 +1260,13 @@ function ChatBubble({
           </div>
         ) : (
           <>
-            <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />
+            {message.role === "assistant" && message.isStreaming && message.content.trimStart().startsWith("{")
+              ? <div className="flex items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-sm text-cyan-100"><Loader2 className="h-4 w-4 animate-spin" /> Structuring CEASER's response…</div>
+              : message.role === "assistant" && !message.isStreaming && parseProjectReport(message.content)
+                ? <ProjectReportCard report={parseProjectReport(message.content)!} />
+                : message.role === "assistant" && !message.isStreaming && parseFridayStructuredResponse(message.content)
+                ? <StructuredResponseCard response={parseFridayStructuredResponse(message.content)!} />
+                : <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
             {message.role === "user" && (
               <button
                 onClick={() => onEdit(message)}
@@ -1232,6 +1337,8 @@ function ResponseActions({
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null)
   const [saved, setSaved] = useState(false)
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
+  const [savedDocumentName, setSavedDocumentName] = useState<string | null>(null)
   const content = message.content.trim()
   const hasBackendSuggestions = safeArray(message.metadata?.suggestions).length > 0
   const contextualActions = useMemo(() => getContextualActions(content), [content])
@@ -1290,8 +1397,27 @@ function ResponseActions({
     window.dispatchEvent(new Event(SAVED_RESPONSE_EVENT))
   }
 
+  const saveAsDocument = async () => {
+    const request = message.documentRequest
+    if (!request || isSavingDocument || savedDocumentName) return
+    setIsSavingDocument(true)
+    try {
+      const generated = await documentsApi.create({
+        kind: request.kind,
+        prompt: previousUserPrompt || `Create a ${request.label}`,
+        agent_id: request.agentId,
+        source_content: content.slice(0, 50000),
+      })
+      setSavedDocumentName(generated.document.file_name || "Document saved")
+      window.dispatchEvent(new Event("ceaser:activity-updated"))
+    } finally {
+      setIsSavingDocument(false)
+    }
+  }
+
   const universal: ResponseAction[] = [
     { id: "copy", label: copied ? "Copied" : "Copy", icon: copied ? Check : Copy, run: copyText },
+    ...(message.documentRequest ? [{ id: "save-document", label: savedDocumentName ? "Saved to Files" : isSavingDocument ? "Saving..." : "Save to Files", icon: savedDocumentName ? Check : FileText, run: saveAsDocument }] : []),
     { id: "like", label: "Like", icon: ThumbsUp, run: () => setFeedback(feedback === "like" ? null : "like") },
     { id: "dislike", label: "Dislike", icon: ThumbsDown, run: () => setFeedback(feedback === "dislike" ? null : "dislike") },
     { id: "share", label: "Share", icon: Share2, run: shareText },
@@ -1473,13 +1599,22 @@ function slugify(value: string) {
 
 function MarkdownMessage({ content, isUser, isStreaming }: { content: string; isUser: boolean; isStreaming?: boolean }) {
   if (isUser) return <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+  if (isStreaming && !content.trim()) {
+    return <div className="flex items-center gap-2 text-sm text-white/60"><Loader2 className="h-4 w-4 animate-spin" /> Writing response…</div>
+  }
+  // During streaming, render the raw partial text immediately. Waiting for a
+  // newline makes normal one-line answers appear frozen until completion.
+  // Once the stream finishes, this component re-renders the same content with
+  // the richer Markdown layout below.
   if (isStreaming) {
     return (
-      <div className="space-y-1">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{content}</p>
-      </div>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">
+        {content}
+        <span aria-label="CEASER is typing" className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-cyan-300 align-[-2px]" />
+      </p>
     )
   }
+
   const structured = parseAnswerSections(content)
   if (structured) return <StructuredAnswer data={structured} />
 

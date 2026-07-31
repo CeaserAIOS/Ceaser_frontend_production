@@ -4,10 +4,15 @@ type RequestOptions = Omit<RequestInit, "body"> & {
 }
 
 export function getApiBaseUrl() {
+  // An explicit environment URL must win, including during local frontend
+  // development. This lets localhost use the deployed Render backend instead
+  // of silently switching to a stale local backend.
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_CEASER_API_URL
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "")
   if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
     return "http://127.0.0.1:8000"
   }
-  return process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_CEASER_API_URL ?? "https://ceaser-backend-production.onrender.com"
+  return "https://ceaser-backend-production.onrender.com"
 }
 
 const API_BASE_URL = getApiBaseUrl()
@@ -152,7 +157,10 @@ function timeoutFor(path: string) {
     return path.startsWith("/commercial") || path.startsWith("/billing") ? 30000 : 180000
   }
   if (/^\/files\/[^/]+\/analyze$/.test(path)) return 90000
-  return 12000
+  // Render can need a short cold-start window for ordinary data endpoints.
+  // Keep generation-specific limits above, but do not fail a page load after
+  // only 12 seconds while the service is waking up.
+  return 30000
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -221,11 +229,19 @@ export async function apiStreamRequest(
   } = {},
 ) {
   const accessToken = getAccessToken()
-  let response = await request(path, options, accessToken)
+  const streamOptions: RequestOptions = {
+    ...options,
+    headers: {
+      Accept: "text/event-stream",
+      "Cache-Control": "no-cache",
+      ...options.headers,
+    },
+  }
+  let response = await request(path, streamOptions, accessToken)
 
   if (response.status === 401 && shouldRefresh(path)) {
     const refreshedToken = await refreshAccessToken()
-    if (refreshedToken) response = await request(path, options, refreshedToken)
+    if (refreshedToken) response = await request(path, streamOptions, refreshedToken)
   }
 
   if (!response.ok || !response.body) {

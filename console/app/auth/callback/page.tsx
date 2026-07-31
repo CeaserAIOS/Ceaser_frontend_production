@@ -5,8 +5,11 @@ import { authApi } from "@/lib/api/auth"
 
 export default function AuthCallbackPage() {
   useEffect(() => {
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname)
     const consoleUrl = (
-      process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
+      isLocalhost
+        ? `${window.location.origin}/console`
+        : process.env.NEXT_PUBLIC_APP_URL || `${window.location.origin}/console`
     ).replace(/\/$/, "")
     try {
       const session = authApi.consumeOAuthRedirect()

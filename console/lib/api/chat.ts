@@ -164,6 +164,7 @@ export const chatApi = {
     conversationId: string | undefined,
     fileIds: string[] | undefined,
     handlers: {
+      onStatus?: (payload: Record<string, unknown>) => void
       onToken?: (text: string) => void
       onComplete?: (response: CeaserChatResponse) => void
       onError?: (message: string) => void
@@ -182,6 +183,7 @@ export const chatApi = {
         },
       },
       {
+        onStatus: handlers.onStatus,
         onToken: handlers.onToken,
         onComplete: (payload) => handlers.onComplete?.(payload as unknown as CeaserChatResponse),
         onError: handlers.onError,

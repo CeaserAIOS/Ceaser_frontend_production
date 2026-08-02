@@ -24,7 +24,7 @@ export default function VerifiedPage() {
         </p>
         <div className="mt-8 flex justify-center">
           <Link
-            href="/"
+            href="/console/"
             className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
           >
             Go back and sign in

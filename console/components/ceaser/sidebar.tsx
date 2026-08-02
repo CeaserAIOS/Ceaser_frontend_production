@@ -1,13 +1,15 @@
 ﻿"use client"
 
 import Image from "next/image"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import { ShieldCheck } from "lucide-react"
 import favicon from "@/public/favicon.png"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
 import lightWordmark from "@/public/ceaser-wordmark-light-transparent.png"
 import { useApp } from "@/lib/app-context"
 import { useAgentStore } from "@/lib/stores/agent-store"
 import { ceaserAgents, navigationItems } from "@/lib/ceaser"
+import { adminApi } from "@/lib/api/admin"
 import { AgentAvatar } from "./agent-avatar"
 import { cn } from "@/lib/utils"
 import { Plus } from "lucide-react"
@@ -16,6 +18,7 @@ export function Sidebar() {
   const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed, theme } = useApp()
   const { isAgentEnabled } = useAgentStore()
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const expandSidebar = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
@@ -30,6 +33,24 @@ export function Sidebar() {
   useEffect(() => () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
   }, [])
+
+  useEffect(() => {
+    let mounted = true
+    adminApi.me()
+      .then((result) => {
+        if (mounted) setIsAdmin(Boolean(result.is_admin))
+      })
+      .catch(() => {
+        if (mounted) setIsAdmin(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const visibleNavigation = isAdmin
+    ? [...navigationItems, { id: "admin" as const, label: "Admin", icon: ShieldCheck }]
+    : navigationItems
 
   return (
     <aside 
@@ -66,7 +87,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2">
         <div className="space-y-1">
-          {navigationItems.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon
             const isActive = currentPage === item.id
             return (

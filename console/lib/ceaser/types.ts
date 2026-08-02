@@ -30,6 +30,7 @@ export type AppPage =
   | "automations"
   | "integrations"
   | "analytics"
+  | "admin"
   | "settings"
 
 export interface CeaserModule {

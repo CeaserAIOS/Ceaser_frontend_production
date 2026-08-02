@@ -12,6 +12,7 @@ import { GoalsPage } from "./pages/goals-page"
 import { FilesPage } from "./pages/files-page"
 import { IntegrationsPage } from "./pages/integrations-page"
 import { SettingsPage } from "./pages/settings-page"
+import { AdminPage } from "./pages/admin-page"
 
 export function AppContent() {
   const { currentPage } = useApp()
@@ -41,6 +42,8 @@ export function AppContent() {
       return <IntegrationsPage />
     case "settings":
       return <SettingsPage />
+    case "admin":
+      return <AdminPage />
     default:
       return <MissionControl />
   }

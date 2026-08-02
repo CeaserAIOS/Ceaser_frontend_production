@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { authApi, type AuthSession } from "@/lib/api/auth"
+import { adminApi } from "@/lib/api/admin"
 import { clearAuthTokens, getAccessToken } from "@/lib/api/client"
 import { CeaserSelect } from "./ceaser-select"
 import { CeaserLogo } from "./ceaser-logo"
@@ -171,7 +172,12 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       }
       setEmail(signedInEmail)
       if (authMode === "login") {
-        setCurrentPage("mission-control")
+        try {
+          const admin = await adminApi.me()
+          setCurrentPage(admin.is_admin ? "admin" : "mission-control")
+        } catch {
+          setCurrentPage("mission-control")
+        }
         window.localStorage.setItem(ONBOARDING_KEY, "true")
         setOnboardingComplete(true)
         return

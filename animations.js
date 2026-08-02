@@ -65,6 +65,26 @@
     });
   }
 
+  /* -------- Download tracking -------- */
+  document.querySelectorAll('a[href="/downloads/"], a[href="/downloads"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      var apiBase = ((window.CEASER_CONFIG && window.CEASER_CONFIG.API_BASE_URL) || "https://ceaser-backend-production.onrender.com").replace(/\/$/, "");
+      var payload = JSON.stringify({ source: "landing", platform: "windows", version: "v1.0" });
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(apiBase + "/admin/downloads/track", new Blob([payload], { type: "application/json" }));
+          return;
+        }
+        fetch(apiBase + "/admin/downloads/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+        }).catch(function () {});
+      } catch (_error) {}
+    });
+  });
+
   /* -------- Scroll reveal -------- */
   var revealEls = document.querySelectorAll(".reveal, .reveal-stagger");
   if ("IntersectionObserver" in window && revealEls.length) {

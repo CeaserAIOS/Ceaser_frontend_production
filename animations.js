@@ -1,6 +1,14 @@
 (function () {
   "use strict";
 
+  /* -------- Supabase verification safety redirect -------- */
+  (function redirectAuthHashFromLanding() {
+    if (!window.location.hash || !/(access_token|refresh_token|type=signup|type=recovery)/.test(window.location.hash)) return;
+    var path = window.location.pathname.replace(/\/+$/, "");
+    if (path.indexOf("/console/auth/") === 0) return;
+    window.location.replace("/console/auth/verified/" + window.location.hash);
+  })();
+
   /* -------- Launch phase swap -------- */
   (function applyLaunchPhase() {
     var cfg = window.CEASER_CONFIG || {};

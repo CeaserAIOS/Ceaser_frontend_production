@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 
 type AnyRecord = Record<string, unknown>
+type IntegrationWithProvider = IntegrationRecord & { provider?: string }
 
 type KnowledgeSegment = {
   label: string
@@ -76,6 +77,18 @@ function getProviderItems(integration?: IntegrationRecord | null) {
     ...asArray(payload.pages),
     ...asArray(payload.databases),
   ]
+}
+
+function providerKey(integration: IntegrationRecord | IntegrationWithProvider) {
+  const provider = readString((integration as IntegrationWithProvider).provider)
+  const id = readString(integration.id).toLowerCase()
+  const name = readString(integration.name)
+  const candidate = provider || (["github", "notion"].includes(id) ? id : name || id)
+  return candidate.toLowerCase().replace(/\s+/g, "-")
+}
+
+function findIntegration(records: IntegrationRecord[], provider: string) {
+  return records.find((item) => providerKey(item) === provider || item.id === provider || item.name.toLowerCase() === provider)
 }
 
 function getRepoName(repo: AnyRecord) {
@@ -211,6 +224,19 @@ export function MissionControl() {
       if (conversationResult.status === "fulfilled") setConversations(conversationResult.value)
       if (integrationResult.status === "fulfilled") setIntegrations(integrationResult.value)
       setIsLoading(false)
+
+      if (integrationResult.status === "fulfilled") {
+        const connectedWorkspaceProviders = integrationResult.value
+          .filter((item) => item.connected && ["github", "notion"].includes(providerKey(item)))
+          .filter((item) => getProviderItems(item).length === 0)
+        if (connectedWorkspaceProviders.length) {
+          await Promise.allSettled(connectedWorkspaceProviders.map((item) => integrationsApi.sync(providerKey(item))))
+          if (!mounted) return
+          const refreshed = await integrationsApi.list()
+          if (!mounted) return
+          setIntegrations(refreshed)
+        }
+      }
     }
     void loadMissionData()
     return () => {
@@ -221,8 +247,8 @@ export function MissionControl() {
   const profile = readUserProfile()
   const displayName = getUserDisplayName(profile)
   const firstName = displayName.split(" ")[0] || "Akshay"
-  const github = integrations.find((item) => item.name === "github")
-  const notion = integrations.find((item) => item.name === "notion")
+  const github = findIntegration(integrations, "github")
+  const notion = findIntegration(integrations, "notion")
   const githubItems = getProviderItems(github)
   const notionItems = getProviderItems(notion)
   const repoItems = githubItems.filter((item) => readString(item.full_name) || readString(item.name))

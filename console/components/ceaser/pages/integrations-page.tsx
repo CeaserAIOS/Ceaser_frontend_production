@@ -29,7 +29,7 @@ import {
 
 type Filter = "all" | "connected" | "available"
 
-const liveProviders = new Set<string>()
+const liveProviders = new Set<string>(["notion"])
 const launchMessage = "Prepared for verified access after launch."
 
 const fallbackProviders: IntegrationRecord[] = [
@@ -38,7 +38,7 @@ const fallbackProviders: IntegrationRecord[] = [
   providerStub("google-drive", "Google Drive", "Drive file context prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-tasks", "Google Tasks", "Task sync prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-classroom", "Google Classroom", "Academic workspace sync prepared for verified Google access.", "coming_soon"),
-  providerStub("notion", "Notion", "Knowledge sync prepared for a future update.", "coming_soon"),
+  providerStub("notion", "Notion", "Connect your pages, databases, and knowledge workspace.", "not_connected"),
   providerStub("slack", "Slack", "Send messages and get updates in Slack.", "coming_soon"),
   providerStub("microsoft-outlook", "Microsoft Outlook", "Sync emails, contacts and calendar.", "coming_soon"),
   providerStub("github", "GitHub", "Connect repos and track activity.", "coming_soon"),
@@ -193,7 +193,7 @@ export function IntegrationsPage() {
           <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-4xl font-bold tracking-tight">Integrations</h1>
-              <p className="mt-2 text-muted-foreground">Google sign-in is active. Workspace integrations are prepared for verified access.</p>
+              <p className="mt-2 text-muted-foreground">Connect approved tools and let CEASER work with your knowledge workspace.</p>
             </div>
             <div className="flex gap-3">
               <label className="flex h-12 w-[360px] max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
@@ -426,6 +426,7 @@ function permissionLabels(integration: IntegrationRecord) {
   if (integration.id === "google-drive") return ["Read Drive metadata", "Read supported document content", "Access profile info"]
   if (integration.id === "google-tasks") return ["Read task lists", "Read tasks and due dates", "Access profile info"]
   if (integration.id === "google-classroom") return ["Read courses", "Read coursework", "Read assignments and due dates"]
+  if (integration.id === "notion") return ["Read pages", "Read databases", "Read workspace metadata"]
   return ["Read account metadata", "Use connection status", "Access profile info"]
 }
 
@@ -447,6 +448,13 @@ function featureLabels(integration: IntegrationRecord) {
     return [
       { title: "Daily Agenda", detail: "Ask CEASER what is on your schedule", icon: <Calendar className="h-3.5 w-3.5" /> },
       { title: "Meeting Context", detail: "Use events in briefings and planning", icon: <Sparkles className="h-3.5 w-3.5" /> },
+    ]
+  }
+  if (integration.id === "notion") {
+    return [
+      { title: "Knowledge Search", detail: "Use Notion pages as workspace context", icon: <Search className="h-3.5 w-3.5" /> },
+      { title: "Database Awareness", detail: "Read shared databases and page metadata", icon: <Database className="h-3.5 w-3.5" /> },
+      { title: "Secure Read Mode", detail: "CEASER reads approved content only", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
     ]
   }
   return [

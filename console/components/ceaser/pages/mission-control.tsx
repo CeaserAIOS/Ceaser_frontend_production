@@ -185,6 +185,23 @@ function Sparkline({ values }: { values: number[] }) {
   )
 }
 
+function NotionLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#fff" stroke="#111827" strokeWidth="2.4" d="M10 7.5 35.8 5l5.2 4.2v29.6L15.2 43 7 37.1V12.3l3-4.8Z" />
+      <path fill="#111827" d="M17 17.5h3.9l9.9 15.6V17.5h3.3v18.9h-3.8L20.3 20.8v15.6H17V17.5Z" />
+    </svg>
+  )
+}
+
+function GithubBrandLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#181717" d="M24 5.5c-10.5 0-19 8.5-19 19 0 8.4 5.4 15.5 12.9 18 .9.2 1.2-.4 1.2-.9v-3.2c-5.2 1.1-6.3-2.2-6.3-2.2-.9-2.1-2.1-2.7-2.1-2.7-1.7-1.2.1-1.2.1-1.2 1.9.1 2.9 2 2.9 2 1.7 2.9 4.5 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.6-2.1-8.6-9.3 0-2.1.7-3.8 2-5.1-.2-.5-.8-2.5.2-5 0 0 1.6-.5 5.2 2 1.5-.4 3.1-.6 4.8-.6s3.3.2 4.8.6c3.6-2.5 5.2-2 5.2-2 1 2.5.4 4.5.2 5 1.2 1.3 2 3 2 5.1 0 7.2-4.4 8.8-8.6 9.3.7.6 1.3 1.8 1.3 3.6v5.3c0 .5.3 1.1 1.3.9C37.6 40 43 32.9 43 24.5c0-10.5-8.5-19-19-19Z" />
+    </svg>
+  )
+}
+
 function AnimatedKnowledgeDonut({ loading, total, segments, onClick }: { loading: boolean; total: number; segments: KnowledgeSegment[]; onClick: () => void }) {
   return (
     <button
@@ -491,8 +508,8 @@ export function MissionControl() {
                 <Panel title="Connections" action={<ViewAllButton page="integrations" />}>
                   <div className="space-y-3 p-5">
                     {[
-                      { name: "GitHub", icon: <Github className="h-9 w-9" />, record: github },
-                      { name: "Notion", icon: <NotebookText className="h-9 w-9" />, record: notion },
+                      { name: "GitHub", icon: <GithubBrandLogo className="h-10 w-10" />, record: github },
+                      { name: "Notion", icon: <NotionLogo className="h-10 w-10" />, record: notion },
                     ].map((item) => (
                       <button key={item.name} onClick={() => setCurrentPage("integrations")} className="flex w-full items-center gap-4 rounded-2xl border border-white/5 bg-white/[.025] p-4 text-left transition hover:border-cyan-300/30">
                         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-slate-950">{item.icon}</span>

@@ -44,7 +44,7 @@ const fallbackProviders: IntegrationRecord[] = [
 export function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>(fallbackProviders)
   const [optimisticConnected, setOptimisticConnected] = useState<Set<string>>(new Set())
-  const [selectedId, setSelectedId] = useState("gmail")
+  const [selectedId, setSelectedId] = useState("notion")
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
   const [isLoading, setIsLoading] = useState(true)
@@ -91,7 +91,7 @@ export function IntegrationsPage() {
     try {
       const records = await integrationsApi.list()
       setIntegrations(mergeFallbacks(records, optimisticConnected))
-      if (!records.some((item) => item.id === selectedId)) setSelectedId(records[0]?.id || "gmail")
+      if (!records.some((item) => item.id === selectedId)) setSelectedId(records[0]?.id || "notion")
     } catch (error) {
       if (options.showErrors) setMessage(error instanceof Error ? error.message : "Could not load integrations.")
     } finally {
@@ -182,7 +182,7 @@ export function IntegrationsPage() {
   })
 
   return (
-    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.13),transparent_34%),linear-gradient(135deg,#050812,#0b1020_52%,#070912)] p-6">
+    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(79,140,255,0.16),transparent_32%),linear-gradient(135deg,#f7faff,#eef4ff_54%,#f8fbff)] p-6 text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.13),transparent_34%),linear-gradient(135deg,#050812,#0b1020_52%,#070912)] dark:text-white">
       <div className="mx-auto grid max-w-[1400px] gap-5 xl:grid-cols-[1fr_360px]">
         <main className="min-w-0">
           <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -191,18 +191,18 @@ export function IntegrationsPage() {
               <p className="mt-2 text-muted-foreground">Connect approved tools and let CEASER work with your knowledge workspace.</p>
             </div>
             <div className="flex gap-3">
-              <label className="flex h-12 w-[360px] max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <label className="flex h-12 w-[360px] max-w-full items-center gap-3 rounded-xl border border-slate-200 bg-white/85 px-4 text-sm shadow-sm dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search integrations..." className="w-full bg-transparent outline-none placeholder:text-muted-foreground" />
               </label>
-              <button onClick={() => void loadIntegrations({ showLoading: true, showErrors: true })} disabled={isLoading} className="flex h-12 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-60">
+              <button onClick={() => void loadIntegrations({ showLoading: true, showErrors: true })} disabled={isLoading} className="flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-5 text-sm font-semibold shadow-sm transition hover:bg-white disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:bg-white/10">
                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                 Refresh All
               </button>
             </div>
           </header>
 
-          <div className="mb-7 flex gap-7 border-b border-white/10 text-sm font-medium">
+          <div className="mb-7 flex gap-7 border-b border-slate-200 text-sm font-medium dark:border-white/10">
             <Tab label="All Integrations" active={filter === "all"} onClick={() => setFilter("all")} />
             <Tab label={`Connected (${connectedCount})`} active={filter === "connected"} onClick={() => setFilter("connected")} />
             <Tab label={`Prepared (${availableCount})`} active={filter === "available"} onClick={() => setFilter("available")} />
@@ -238,7 +238,7 @@ export function IntegrationsPage() {
           </p>
         </main>
 
-        <aside className="sticky top-4 h-fit overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] shadow-[0_30px_100px_rgba(0,0,0,0.35)]">
+        <aside className="sticky top-4 h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_30px_100px_rgba(0,0,0,0.35)]">
           {selected && (
             <>
               <div className="p-6">
@@ -257,7 +257,7 @@ export function IntegrationsPage() {
                 <div className="mt-6 flex gap-2">
                   {selected.connected ? (
                     <>
-                      <button onClick={() => void sync(selected.id)} disabled={busyProvider === selected.id} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-60">
+                      <button onClick={() => void sync(selected.id)} disabled={busyProvider === selected.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-4 py-2 text-sm font-semibold transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/10">
                         {busyProvider === selected.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                         Sync
                       </button>
@@ -266,7 +266,7 @@ export function IntegrationsPage() {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className={cn("rounded-xl px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70", liveProviders.has(selected.id) ? "bg-gradient-to-r from-blue-500 to-violet-600 text-white hover:opacity-95" : "bg-white/10 text-muted-foreground")}>
+                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className={cn("rounded-xl px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70", liveProviders.has(selected.id) ? "bg-gradient-to-r from-blue-500 to-violet-600 text-white hover:opacity-95" : "bg-slate-100 text-muted-foreground dark:bg-white/10")}>
                       {liveProviders.has(selected.id) ? "Connect" : "Prepared"}
                     </button>
                   )}
@@ -285,7 +285,7 @@ export function IntegrationsPage() {
                 ))}
               </PanelSection>
 
-              <div className="border-t border-white/10 p-6 text-sm">
+              <div className="border-t border-slate-200 p-6 text-sm dark:border-white/10">
                 <p className="text-muted-foreground">Last sync</p>
                 <p className="mt-1 font-medium">{selected.last_sync_at ? formatDate(selected.last_sync_at) : selected.connected ? "Ready to sync" : "Not connected"}</p>
               </div>
@@ -311,8 +311,8 @@ function IntegrationCard({ integration, selected, busy, onSelect, onConnect, onD
     <article
       onClick={onSelect}
       className={cn(
-        "group flex min-h-[150px] cursor-pointer flex-col justify-between rounded-xl border bg-white/[0.045] p-5 transition hover:-translate-y-0.5 hover:bg-white/[0.07]",
-        selected ? "border-violet-500/70 shadow-[0_0_35px_rgba(124,58,237,0.16)]" : "border-white/10",
+        "group flex min-h-[150px] cursor-pointer flex-col justify-between rounded-xl border bg-white/82 p-5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:bg-white/[0.045] dark:hover:bg-white/[0.07]",
+        selected ? "border-violet-500/70 shadow-[0_18px_46px_rgba(124,58,237,0.16)] dark:shadow-[0_0_35px_rgba(124,58,237,0.16)]" : "border-slate-200 dark:border-white/10",
       )}
     >
       <div className="flex items-start justify-between gap-4">
@@ -333,7 +333,7 @@ function IntegrationCard({ integration, selected, busy, onSelect, onConnect, onD
         <div className="flex items-center gap-2">
           {integration.connected ? (
             <>
-              <button onClick={(event) => { event.stopPropagation(); onSync() }} disabled={busy} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-white/10 disabled:opacity-60">
+              <button onClick={(event) => { event.stopPropagation(); onSync() }} disabled={busy} className="rounded-lg border border-slate-200 bg-white/70 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/10">
                 {busy ? "Syncing" : "Sync"}
               </button>
               <button onClick={(event) => { event.stopPropagation(); onDisconnect() }} disabled={busy} className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-60">
@@ -355,7 +355,7 @@ function IntegrationCard({ integration, selected, busy, onSelect, onConnect, onD
 function IntegrationLogo({ id, large = false }: { id: string; large?: boolean }) {
   const size = large ? "h-16 w-16 text-2xl" : "h-12 w-12 text-xl"
   const iconClass = large ? "h-8 w-8" : "h-6 w-6"
-  const base = "flex shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+  const base = "flex shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_rgba(15,23,42,0.08)]"
   if (id === "gmail") return <div className={cn(base, size, "bg-white text-red-500")}><Mail className={iconClass} /></div>
   if (id === "google-calendar") return <div className={cn(base, size, "bg-white text-blue-500")}><Calendar className={iconClass} /></div>
   if (id === "google-drive") return <div className={cn(base, size, "bg-gradient-to-br from-emerald-400 via-yellow-400 to-blue-500 text-white")}><FileText className={iconClass} /></div>
@@ -374,7 +374,7 @@ function StatusPill({ integration }: { integration: IntegrationRecord }) {
   return (
     <span className={cn(
       "shrink-0 rounded-lg px-3 py-1 text-xs font-semibold",
-      integration.connected ? "bg-emerald-500/18 text-emerald-300" : integration.status === "credentials_required" ? "bg-amber-500/15 text-amber-300" : "bg-white/10 text-muted-foreground",
+      integration.connected ? "bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/18 dark:text-emerald-300" : integration.status === "credentials_required" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-muted-foreground",
     )}>
       {label}
     </span>
@@ -383,7 +383,7 @@ function StatusPill({ integration }: { integration: IntegrationRecord }) {
 
 function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={cn("relative pb-4 text-muted-foreground transition hover:text-foreground", active && "text-violet-300")}>
+    <button onClick={onClick} className={cn("relative pb-4 text-muted-foreground transition hover:text-foreground", active && "text-violet-600 dark:text-violet-300")}>
       {label}
       {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-violet-500" />}
     </button>
@@ -392,7 +392,7 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
 
 function PanelSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-t border-white/10 p-6">
+    <section className="border-t border-slate-200 p-6 dark:border-white/10">
       <h3 className="mb-4 font-semibold">{title}</h3>
       <div className="space-y-3">{children}</div>
     </section>
@@ -402,7 +402,7 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
 function DetailRow({ icon, text, subtext }: { icon: ReactNode; text: string; subtext?: string }) {
   return (
     <div className="flex gap-3 text-sm">
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">{icon}</span>
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">{icon}</span>
       <span>
         <span className="block text-foreground">{text}</span>
         {subtext && <span className="text-xs text-muted-foreground">{subtext}</span>}

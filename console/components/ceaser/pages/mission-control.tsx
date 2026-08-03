@@ -41,6 +41,15 @@ type KnowledgeSegment = {
 }
 
 const MAX_ACTIVITY_ITEMS = 5
+const MISSION_CACHE_KEY = "ceaser_mission_control_cache_v1"
+const LIVE_DATA_TIMEOUT_MS = 5000
+
+type MissionCache = {
+  projects: ProjectRecord[]
+  memories: MemoryRecord[]
+  conversations: ConversationRecord[]
+  integrations: IntegrationRecord[]
+}
 
 function asRecord(value: unknown): AnyRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {}
@@ -176,6 +185,23 @@ function Sparkline({ values }: { values: number[] }) {
   )
 }
 
+function AnimatedKnowledgeDonut({ loading, total, segments, onClick }: { loading: boolean; total: number; segments: KnowledgeSegment[]; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative mx-auto grid h-52 w-52 place-items-center rounded-full transition ${loading ? "animate-[spin_2.4s_linear_infinite]" : ""}`}
+      style={{ background: loading ? "conic-gradient(from 0deg, #22d3ee, #a855f7, #f97316, #22d3ee)" : buildConicGradient(segments) }}
+    >
+      <div className="absolute inset-4 rounded-full bg-[#081427] shadow-[inset_0_0_40px_rgba(0,0,0,.75)]" />
+      <div className={loading ? "relative animate-[spin_2.4s_linear_infinite_reverse] text-center" : "relative text-center"}>
+        <p className="text-4xl font-semibold text-white">{total}</p>
+        <p className="text-sm text-slate-400">{loading ? "Loading items" : "Total Items"}</p>
+      </div>
+    </button>
+  )
+}
+
 function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-2xl border border-cyan-300/10 bg-[#071323]/78 shadow-[0_20px_80px_rgba(0,0,0,.22),inset_0_1px_0_rgba(255,255,255,.04)] backdrop-blur-xl ${className}`}>
@@ -200,6 +226,33 @@ function ViewAllButton({ page }: { page: AppPage }) {
   )
 }
 
+function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(fallback), LIVE_DATA_TIMEOUT_MS)
+    promise
+      .then((value) => resolve(value))
+      .catch(() => resolve(fallback))
+      .finally(() => window.clearTimeout(timer))
+  })
+}
+
+function readMissionCache(): MissionCache | null {
+  try {
+    const cached = window.localStorage.getItem(MISSION_CACHE_KEY)
+    return cached ? (JSON.parse(cached) as MissionCache) : null
+  } catch {
+    return null
+  }
+}
+
+function writeMissionCache(data: MissionCache) {
+  try {
+    window.localStorage.setItem(MISSION_CACHE_KEY, JSON.stringify(data))
+  } catch {
+    // Cache is optional; ignore storage quota/private mode failures.
+  }
+}
+
 export function MissionControl() {
   const { setCurrentPage, setIsSearchOpen, startNewChatWithPrompt } = useApp()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
@@ -207,35 +260,53 @@ export function MissionControl() {
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isIntegrationRefreshing, setIsIntegrationRefreshing] = useState(true)
 
   useEffect(() => {
     let mounted = true
     async function loadMissionData() {
+      const cached = readMissionCache()
+      if (cached) {
+        setProjects(cached.projects)
+        setMemories(cached.memories)
+        setConversations(cached.conversations)
+        setIntegrations(cached.integrations)
+        setIsLoading(false)
+      }
+
       setIsLoading(true)
-      const [projectResult, memoryResult, conversationResult, integrationResult] = await Promise.allSettled([
-        projectsApi.list(),
-        memoryApi.list(),
-        chatApi.listConversations(false),
-        integrationsApi.list(),
+      setIsIntegrationRefreshing(true)
+      const [projectValue, memoryValue, conversationValue, integrationValue] = await Promise.all([
+        withTimeout(projectsApi.list(), cached?.projects ?? []),
+        withTimeout(memoryApi.list(), cached?.memories ?? []),
+        withTimeout(chatApi.listConversations(false), cached?.conversations ?? []),
+        withTimeout(integrationsApi.list(), cached?.integrations ?? []),
       ])
       if (!mounted) return
-      if (projectResult.status === "fulfilled") setProjects(projectResult.value)
-      if (memoryResult.status === "fulfilled") setMemories(memoryResult.value)
-      if (conversationResult.status === "fulfilled") setConversations(conversationResult.value)
-      if (integrationResult.status === "fulfilled") setIntegrations(integrationResult.value)
+      setProjects(projectValue)
+      setMemories(memoryValue)
+      setConversations(conversationValue)
+      setIntegrations(integrationValue)
       setIsLoading(false)
+      writeMissionCache({ projects: projectValue, memories: memoryValue, conversations: conversationValue, integrations: integrationValue })
 
-      if (integrationResult.status === "fulfilled") {
-        const connectedWorkspaceProviders = integrationResult.value
-          .filter((item) => item.connected && ["github", "notion"].includes(providerKey(item)))
-          .filter((item) => getProviderItems(item).length === 0)
-        if (connectedWorkspaceProviders.length) {
-          await Promise.allSettled(connectedWorkspaceProviders.map((item) => integrationsApi.sync(providerKey(item))))
-          if (!mounted) return
-          const refreshed = await integrationsApi.list()
-          if (!mounted) return
-          setIntegrations(refreshed)
-        }
+      const connectedWorkspaceProviders = integrationValue
+        .filter((item) => item.connected && ["github", "notion"].includes(providerKey(item)))
+        .filter((item) => getProviderItems(item).length === 0)
+      if (connectedWorkspaceProviders.length) {
+        void Promise.allSettled(connectedWorkspaceProviders.map((item) => integrationsApi.sync(providerKey(item))))
+          .then(() => integrationsApi.list())
+          .then((refreshed) => {
+            if (!mounted) return
+            setIntegrations(refreshed)
+            writeMissionCache({ projects: projectValue, memories: memoryValue, conversations: conversationValue, integrations: refreshed })
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            if (mounted) setIsIntegrationRefreshing(false)
+          })
+      } else {
+        setIsIntegrationRefreshing(false)
       }
     }
     void loadMissionData()
@@ -399,13 +470,7 @@ export function MissionControl() {
             <div className="space-y-5">
               <Panel title="Knowledge Overview">
                 <div className="grid gap-6 p-5 md:grid-cols-[220px_1fr]">
-                  <button onClick={() => setCurrentPage("memory")} className="relative mx-auto grid h-52 w-52 place-items-center rounded-full" style={{ background: buildConicGradient(knowledgeSegments) }}>
-                    <div className="absolute inset-4 rounded-full bg-[#081427] shadow-[inset_0_0_40px_rgba(0,0,0,.75)]" />
-                    <div className="relative text-center">
-                      <p className="text-4xl font-semibold text-white">{totalKnowledgeItems}</p>
-                      <p className="text-sm text-slate-400">Total Items</p>
-                    </div>
-                  </button>
+                  <AnimatedKnowledgeDonut loading={isIntegrationRefreshing} total={totalKnowledgeItems} segments={knowledgeSegments} onClick={() => setCurrentPage("memory")} />
                   <div className="grid content-center gap-3">
                     {knowledgeSegments.map((segment) => (
                       <button key={segment.label} onClick={() => setCurrentPage(segment.page)} className="flex items-center justify-between rounded-xl px-2 py-1 text-left transition hover:bg-white/[.04]">

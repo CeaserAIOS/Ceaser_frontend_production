@@ -10,11 +10,9 @@ import {
   Database,
   FileText,
   Github,
-  Inbox,
   KeyRound,
   Loader2,
   Lock,
-  Mail,
   MoreHorizontal,
   RefreshCw,
   Search,
@@ -353,19 +351,116 @@ function IntegrationCard({ integration, selected, busy, onSelect, onConnect, onD
 }
 
 function IntegrationLogo({ id, large = false }: { id: string; large?: boolean }) {
-  const size = large ? "h-16 w-16 text-2xl" : "h-12 w-12 text-xl"
-  const iconClass = large ? "h-8 w-8" : "h-6 w-6"
-  const base = "flex shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_rgba(15,23,42,0.08)]"
-  if (id === "gmail") return <div className={cn(base, size, "bg-white text-red-500")}><Mail className={iconClass} /></div>
-  if (id === "google-calendar") return <div className={cn(base, size, "bg-white text-blue-500")}><Calendar className={iconClass} /></div>
-  if (id === "google-drive") return <div className={cn(base, size, "bg-gradient-to-br from-emerald-400 via-yellow-400 to-blue-500 text-white")}><FileText className={iconClass} /></div>
-  if (id === "google-tasks") return <div className={cn(base, size, "bg-blue-500/20 text-blue-300")}><Check className={iconClass} /></div>
-  if (id === "google-classroom") return <div className={cn(base, size, "bg-emerald-500/20 text-emerald-300")}><Users className={iconClass} /></div>
-  if (id === "notion") return <div className={cn(base, size, "bg-white text-black")}><span className="font-black">N</span></div>
-  if (id === "microsoft-outlook") return <div className={cn(base, size, "bg-blue-500 text-white")}><Inbox className={iconClass} /></div>
-  if (id === "github") return <div className={cn(base, size, "bg-white text-black")}><Github className={iconClass} /></div>
-  if (id === "microsoft-teams") return <div className={cn(base, size, "bg-violet-500 text-white")}><Users className={iconClass} /></div>
-  return <div className={cn(base, size, "bg-primary/20 text-primary")}><KeyRound className={iconClass} /></div>
+  const size = large ? "h-16 w-16" : "h-12 w-12"
+  const logoSize = large ? "h-10 w-10" : "h-8 w-8"
+  const base = "flex shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_10px_24px_rgba(15,23,42,0.08)] dark:border-white/10"
+  const logos: Record<string, ReactNode> = {
+    gmail: <GmailLogo className={logoSize} />,
+    "google-calendar": <GoogleCalendarLogo className={logoSize} />,
+    "google-drive": <GoogleDriveLogo className={logoSize} />,
+    "google-tasks": <GoogleTasksLogo className={logoSize} />,
+    "google-classroom": <GoogleClassroomLogo className={logoSize} />,
+    notion: <NotionLogo className={logoSize} />,
+    "microsoft-outlook": <OutlookLogo className={logoSize} />,
+    github: <GithubLogo className={logoSize} />,
+    "microsoft-teams": <TeamsLogo className={logoSize} />,
+  }
+  return <div className={cn(base, size)}>{logos[id] || <KeyRound className={logoSize} />}</div>
+}
+
+function GmailLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#EA4335" d="M8 14.5 24 26.4 40 14.5v21.2a3.8 3.8 0 0 1-3.8 3.8H11.8A3.8 3.8 0 0 1 8 35.7V14.5Z" />
+      <path fill="#FBBC04" d="M40 12.3v2.2L24 26.4 8 14.5v-2.2c0-2.8 3.2-4.4 5.4-2.7L24 17.5l10.6-7.9c2.2-1.7 5.4-.1 5.4 2.7Z" />
+      <path fill="#4285F4" d="M8 14.5v21.2a3.8 3.8 0 0 0 3.8 3.8h3V19.6L8 14.5Z" />
+      <path fill="#34A853" d="M33.2 39.5h3a3.8 3.8 0 0 0 3.8-3.8V14.5l-6.8 5.1v19.9Z" />
+    </svg>
+  )
+}
+
+function GoogleCalendarLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#fff" d="M9 8h30a3 3 0 0 1 3 3v26a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3Z" />
+      <path fill="#4285F4" d="M6 16h36v21a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V16Z" />
+      <path fill="#1A73E8" d="M9 8h30a3 3 0 0 1 3 3v5H6v-5a3 3 0 0 1 3-3Z" />
+      <path fill="#fff" d="M17.5 31.9c2.1 0 3.6-1.1 3.6-2.8 0-1.3-.9-2.2-2.2-2.5v-.1c1.1-.4 1.8-1.2 1.8-2.3 0-1.6-1.3-2.6-3.2-2.6-1.6 0-2.9.8-3.5 2.1l1.7.8c.4-.8 1-1.2 1.8-1.2.8 0 1.4.4 1.4 1.1 0 .8-.7 1.2-1.8 1.2h-1v1.6h1.1c1.3 0 2 .5 2 1.4 0 .8-.7 1.4-1.8 1.4-1 0-1.8-.5-2.2-1.4l-1.8.8c.7 1.6 2.1 2.5 4.1 2.5Zm8.8-.2h2V21.9h-1.7l-3.1 2.2 1 1.5 1.8-1.2v7.3Z" />
+    </svg>
+  )
+}
+
+function GoogleDriveLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#0F9D58" d="M18 6h12l12 21H30L18 6Z" />
+      <path fill="#4285F4" d="M18 42h24L30 21H18L6 42h12Z" />
+      <path fill="#F4B400" d="M6 42 18 21 30 6H18L6 27l-6 15h6Z" />
+    </svg>
+  )
+}
+
+function GoogleTasksLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="20" fill="#2684FC" />
+      <path fill="#fff" d="m20.8 29.2-6-6 2.5-2.5 3.5 3.5 9.9-9.9 2.5 2.5-12.4 12.4Z" />
+      <path fill="#fff" opacity=".55" d="M17 34h17v3H17z" />
+    </svg>
+  )
+}
+
+function GoogleClassroomLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#25A667" d="M6 10h36v28H6z" />
+      <path fill="#F6C343" d="M6 34h36v4H6z" />
+      <circle cx="24" cy="21" r="5" fill="#fff" />
+      <path fill="#fff" d="M15 31c1.3-4.3 4.8-6.3 9-6.3s7.7 2 9 6.3H15Z" opacity=".9" />
+    </svg>
+  )
+}
+
+function NotionLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#fff" stroke="#111827" strokeWidth="2.4" d="M10 7.5 35.8 5l5.2 4.2v29.6L15.2 43 7 37.1V12.3l3-4.8Z" />
+      <path fill="#111827" d="M17 17.5h3.9l9.9 15.6V17.5h3.3v18.9h-3.8L20.3 20.8v15.6H17V17.5Z" />
+    </svg>
+  )
+}
+
+function OutlookLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#0078D4" d="M18 9h21a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H18V9Z" />
+      <path fill="#50A7F2" d="M29 14h13v8H29z" />
+      <path fill="#0A63B0" d="M29 26h13v8H29z" />
+      <path fill="#106EBE" d="M6 15 23 12v24L6 33V15Z" />
+      <path fill="#fff" d="M14.7 28.9c-3.2 0-5.2-2.4-5.2-5.2s2-5.3 5.2-5.3 5.2 2.4 5.2 5.3-2 5.2-5.2 5.2Zm0-2.4c1.5 0 2.4-1.2 2.4-2.8s-.9-2.9-2.4-2.9-2.4 1.2-2.4 2.9.9 2.8 2.4 2.8Z" />
+    </svg>
+  )
+}
+
+function GithubLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#181717" d="M24 5.5c-10.5 0-19 8.5-19 19 0 8.4 5.4 15.5 12.9 18 .9.2 1.2-.4 1.2-.9v-3.2c-5.2 1.1-6.3-2.2-6.3-2.2-.9-2.1-2.1-2.7-2.1-2.7-1.7-1.2.1-1.2.1-1.2 1.9.1 2.9 2 2.9 2 1.7 2.9 4.5 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.6-2.1-8.6-9.3 0-2.1.7-3.8 2-5.1-.2-.5-.8-2.5.2-5 0 0 1.6-.5 5.2 2 1.5-.4 3.1-.6 4.8-.6s3.3.2 4.8.6c3.6-2.5 5.2-2 5.2-2 1 2.5.4 4.5.2 5 1.2 1.3 2 3 2 5.1 0 7.2-4.4 8.8-8.6 9.3.7.6 1.3 1.8 1.3 3.6v5.3c0 .5.3 1.1 1.3.9C37.6 40 43 32.9 43 24.5c0-10.5-8.5-19-19-19Z" />
+    </svg>
+  )
+}
+
+function TeamsLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#5059C9" d="M19 14h17a5 5 0 0 1 5 5v11a8 8 0 0 1-8 8H19V14Z" />
+      <path fill="#7B83EB" d="M26 10h11a4 4 0 0 1 4 4v3H26v-7Z" />
+      <circle cx="34" cy="9" r="5" fill="#7B83EB" />
+      <circle cx="24" cy="11" r="6" fill="#5059C9" />
+      <path fill="#4B53BC" d="M7 16h22v22H7z" />
+      <path fill="#fff" d="M13 21h11v3.1h-3.8V34h-3.4v-9.9H13V21Z" />
+    </svg>
+  )
 }
 
 function StatusPill({ integration }: { integration: IntegrationRecord }) {

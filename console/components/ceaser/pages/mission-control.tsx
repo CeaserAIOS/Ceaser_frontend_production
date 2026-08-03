@@ -1,64 +1,216 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import type { AppPage } from "@/lib/ceaser"
 import { useApp } from "@/lib/app-context"
-import { agents, type Agent } from "@/lib/data"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
-import { useAgentStore } from "@/lib/stores/agent-store"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
+import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
-import { AgentAvatar } from "../agent-avatar"
-import { GlowCard, StatCard } from "../glow-card"
-import { OrbitalVisualization } from "../orbital-visualization"
-import { motion } from "framer-motion"
-import { 
-  FolderKanban, 
-  CheckSquare, 
-  Target, 
-  Users,
+import {
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  CircleDot,
+  Clock3,
+  Code2,
+  Database,
   FileText,
+  Github,
+  GitPullRequest,
+  Layers3,
   Loader2,
-  Search
+  MessageSquareText,
+  NotebookText,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  SquareCheckBig,
 } from "lucide-react"
 
-function getMemoryTitle(memory: MemoryRecord) {
-  const metadata = (memory.metadata ?? memory.extra_metadata ?? {}) as { title?: string }
-  return metadata.title || memory.content.split("\n")[0]?.replace(/^#+\s*/, "").slice(0, 72) || "Memory"
+type AnyRecord = Record<string, unknown>
+
+type KnowledgeSegment = {
+  label: string
+  value: number
+  color: string
+  page: AppPage
 }
 
-function getMemoryDescription(memory: MemoryRecord) {
-  const date = memory.created_at ? new Date(memory.created_at) : null
-  const dateLabel = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "recently"
-  return `${memory.memory_type} memory saved ${dateLabel}`
+const MAX_ACTIVITY_ITEMS = 5
+
+function asRecord(value: unknown): AnyRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {}
+}
+
+function asArray(value: unknown): AnyRecord[] {
+  return Array.isArray(value) ? value.filter((item): item is AnyRecord => Boolean(item) && typeof item === "object") : []
+}
+
+function readString(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback
+}
+
+function readNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback
+}
+
+function getIntegrationPayload(integration?: IntegrationRecord | null) {
+  const metadata = asRecord(integration?.metadata)
+  return {
+    ...metadata,
+    ...asRecord(metadata.last_metadata),
+    ...asRecord(metadata.last_sync),
+    ...asRecord(metadata.cache),
+  }
+}
+
+function getProviderItems(integration?: IntegrationRecord | null) {
+  const payload = getIntegrationPayload(integration)
+  return [
+    ...asArray(payload.items),
+    ...asArray(payload.repositories),
+    ...asArray(payload.repos),
+    ...asArray(payload.pages),
+    ...asArray(payload.databases),
+  ]
+}
+
+function getRepoName(repo: AnyRecord) {
+  return readString(repo.full_name) || readString(repo.name) || readString(repo.repository) || "Repository"
+}
+
+function getItemTitle(item: AnyRecord) {
+  return (
+    readString(item.title) ||
+    readString(item.name) ||
+    readString(item.full_name) ||
+    readString(item.display_name) ||
+    readString(item.path) ||
+    "Workspace item"
+  )
+}
+
+function formatRelativeDate(value?: string | null) {
+  if (!value) return "Not synced yet"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Recently"
+  const diffMs = Date.now() - date.getTime()
+  const minutes = Math.max(0, Math.round(diffMs / 60000))
+  if (minutes < 1) return "Just now"
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`
+  const days = Math.round(hours / 24)
+  if (days < 7) return days === 1 ? "Yesterday" : `${days} days ago`
+  return date.toLocaleDateString([], { month: "short", day: "numeric" })
+}
+
+function getMemoryTitle(memory: MemoryRecord) {
+  const metadata = asRecord(memory.metadata ?? memory.extra_metadata)
+  return readString(metadata.title) || memory.content.split("\n")[0]?.replace(/^#+\s*/, "").slice(0, 72) || "Memory"
+}
+
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good Morning"
+  if (hour < 17) return "Good Afternoon"
+  return "Good Evening"
+}
+
+function buildConicGradient(segments: KnowledgeSegment[]) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
+  if (total <= 0) return "conic-gradient(from 180deg, rgba(59,130,246,.35), rgba(168,85,247,.35), rgba(20,184,166,.35), rgba(59,130,246,.35))"
+  let cursor = 0
+  const stops = segments
+    .filter((segment) => segment.value > 0)
+    .map((segment) => {
+      const start = cursor
+      const size = (segment.value / total) * 360
+      cursor += size
+      return `${segment.color} ${start.toFixed(2)}deg ${cursor.toFixed(2)}deg`
+    })
+  return `conic-gradient(from 180deg, ${stops.join(", ")})`
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  const max = Math.max(...values, 1)
+  const points = values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * 220
+      const y = 76 - (value / max) * 58
+      return `${x},${y}`
+    })
+    .join(" ")
+
+  return (
+    <svg viewBox="0 0 220 88" className="h-24 w-full overflow-visible">
+      <defs>
+        <linearGradient id="healthLine" x1="0" x2="1" y1="0" y2="0">
+          <stop stopColor="#22d3ee" />
+          <stop offset="1" stopColor="#10b981" />
+        </linearGradient>
+        <linearGradient id="healthFill" x1="0" x2="0" y1="0" y2="1">
+          <stop stopColor="#10b981" stopOpacity=".28" />
+          <stop offset="1" stopColor="#10b981" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`M0,86 L${points} L220,86 Z`} fill="url(#healthFill)" opacity=".85" />
+      <polyline points={points} fill="none" stroke="url(#healthLine)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+    </svg>
+  )
+}
+
+function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={`rounded-2xl border border-cyan-300/10 bg-[#071323]/78 shadow-[0_20px_80px_rgba(0,0,0,.22),inset_0_1px_0_rgba(255,255,255,.04)] backdrop-blur-xl ${className}`}>
+      <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <h2 className="text-sm font-semibold text-slate-100">
+          <span className="mr-2 text-emerald-400">+</span>
+          {title}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function ViewAllButton({ page }: { page: AppPage }) {
+  const { setCurrentPage } = useApp()
+  return (
+    <button onClick={() => setCurrentPage(page)} className="rounded-full border border-blue-400/15 px-3 py-1 text-xs font-medium text-blue-300 transition hover:border-blue-300/40 hover:text-blue-100">
+      View All
+    </button>
+  )
 }
 
 export function MissionControl() {
-  const { selectedAgentId, setSelectedAgentId, setCurrentPage } = useApp()
-  const { isAgentEnabled } = useAgentStore()
+  const { setCurrentPage, setIsSearchOpen, startNewChatWithPrompt } = useApp()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [memories, setMemories] = useState<MemoryRecord[]>([])
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
-  const [isRailLoading, setIsRailLoading] = useState(true)
-  const [openingAgentId, setOpeningAgentId] = useState<string | null>(null)
-  const openAgentTimerRef = useRef<number | null>(null)
-  
-  const activeAgents = agents.filter((agent) => agent.status === "active" && isAgentEnabled(agent.id))
-  const enabledAgentsCount = agents.filter((agent) => isAgentEnabled(agent.id)).length
+  const [integrations, setIntegrations] = useState<IntegrationRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
   useEffect(() => {
     let mounted = true
     async function loadMissionData() {
-      setIsRailLoading(true)
-      const [projectResult, memoryResult, conversationResult] = await Promise.allSettled([
+      setIsLoading(true)
+      const [projectResult, memoryResult, conversationResult, integrationResult] = await Promise.allSettled([
         projectsApi.list(),
         memoryApi.list(),
         chatApi.listConversations(false),
+        integrationsApi.list(),
       ])
       if (!mounted) return
       if (projectResult.status === "fulfilled") setProjects(projectResult.value)
       if (memoryResult.status === "fulfilled") setMemories(memoryResult.value)
       if (conversationResult.status === "fulfilled") setConversations(conversationResult.value)
-      setIsRailLoading(false)
+      if (integrationResult.status === "fulfilled") setIntegrations(integrationResult.value)
+      setIsLoading(false)
     }
     void loadMissionData()
     return () => {
@@ -66,297 +218,298 @@ export function MissionControl() {
     }
   }, [])
 
-  const handleAgentClick = (agent: Agent) => {
-    if (openAgentTimerRef.current) {
-      window.clearTimeout(openAgentTimerRef.current)
-    }
-    setSelectedAgentId(agent.id)
-    setOpeningAgentId(agent.id)
-    openAgentTimerRef.current = window.setTimeout(() => {
-      setCurrentPage("agents")
-      setOpeningAgentId(null)
-    }, 180)
-  }
+  const profile = readUserProfile()
+  const displayName = getUserDisplayName(profile)
+  const firstName = displayName.split(" ")[0] || "Akshay"
+  const github = integrations.find((item) => item.name === "github")
+  const notion = integrations.find((item) => item.name === "notion")
+  const githubItems = getProviderItems(github)
+  const notionItems = getProviderItems(notion)
+  const repoItems = githubItems.filter((item) => readString(item.full_name) || readString(item.name))
+  const notionPages = notionItems.filter((item) => readString(item.object) === "page" || !readString(item.object))
+  const notionDatabases = notionItems.filter((item) => readString(item.object) === "database")
+  const commits = repoItems.reduce((sum, repo) => sum + asArray(repo.commits).length + readNumber(repo.commit_count), 0)
+  const issues = repoItems.reduce((sum, repo) => sum + asArray(repo.issues).length + readNumber(repo.open_issues_count), 0)
+  const pullRequests = repoItems.reduce((sum, repo) => sum + asArray(repo.pull_requests).length + readNumber(repo.pull_request_count), 0)
+  const notes = memories.length + notionPages.length
+  const allConnected = Boolean(github?.connected) && Boolean(notion?.connected)
 
-  useEffect(() => {
-    return () => {
-      if (openAgentTimerRef.current) {
-        window.clearTimeout(openAgentTimerRef.current)
-      }
-    }
-  }, [])
+  const knowledgeSegments: KnowledgeSegment[] = [
+    { label: "Repositories", value: repoItems.length, color: "#2563eb", page: "integrations" },
+    { label: "Pages", value: notionPages.length, color: "#14b8a6", page: "integrations" },
+    { label: "Notes", value: notes, color: "#a855f7", page: "memory" },
+    { label: "Databases", value: notionDatabases.length, color: "#22d3ee", page: "integrations" },
+    { label: "Commits", value: commits, color: "#f97316", page: "integrations" },
+    { label: "Issues", value: issues, color: "#f59e0b", page: "integrations" },
+    { label: "Pull Requests", value: pullRequests, color: "#3b82f6", page: "integrations" },
+  ]
+  const totalKnowledgeItems = knowledgeSegments.reduce((sum, segment) => sum + segment.value, 0)
 
-  const stats = {
-    projects: projects.length,
-    tasks: conversations.length,
-    goals: memories.filter((memory) => memory.memory_type === "goal").length || conversations.length,
-    agentsActive: activeAgents.length,
-    agentsTotal: enabledAgentsCount
-  }
+  const metricCards = [
+    { label: "GitHub", title: "Repositories", value: repoItems.length, delta: repoItems.length ? `+${Math.min(repoItems.length, 9)}` : "0", icon: <Github className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Commits", title: "Recent", value: commits, delta: commits ? `+${Math.min(commits, 18)}` : "0", icon: <Code2 className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Issues", title: "Open", value: issues, delta: issues ? `${issues}` : "0", icon: <CircleDot className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Pull Requests", title: "Open", value: pullRequests, delta: pullRequests ? `+${pullRequests}` : "0", icon: <GitPullRequest className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Notion", title: "Pages", value: notionPages.length, delta: notionPages.length ? `+${Math.min(notionPages.length, 9)}` : "0", icon: <NotebookText className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Databases", title: "Databases", value: notionDatabases.length, delta: notionDatabases.length ? `+${notionDatabases.length}` : "0", icon: <Database className="h-7 w-7" />, page: "integrations" as AppPage },
+    { label: "Notes", title: "Knowledge", value: notes, delta: notes ? `+${Math.min(notes, 12)}` : "0", icon: <FileText className="h-7 w-7" />, page: "memory" as AppPage },
+  ]
+
+  const recentActivity = useMemo(() => {
+    const githubActivity = repoItems.slice(0, 3).map((repo) => ({
+      id: `github-${getRepoName(repo)}`,
+      icon: <Github className="h-5 w-5" />,
+      title: getRepoName(repo),
+      subtitle: github?.last_sync_at ? `Updated ${formatRelativeDate(github.last_sync_at)}` : "Visible GitHub repository",
+      badge: "Updated",
+      page: "integrations" as AppPage,
+    }))
+    const notionActivity = notionItems.slice(0, 3).map((item) => ({
+      id: `notion-${getItemTitle(item)}`,
+      icon: <NotebookText className="h-5 w-5" />,
+      title: getItemTitle(item),
+      subtitle: notion?.last_sync_at ? `Synced ${formatRelativeDate(notion.last_sync_at)}` : readString(item.object, "Notion item"),
+      badge: readString(item.object) === "database" ? "Database" : "Page",
+      page: "integrations" as AppPage,
+    }))
+    const memoryActivity = memories.slice(0, 2).map((memory) => ({
+      id: `memory-${memory.id}`,
+      icon: <BookOpen className="h-5 w-5" />,
+      title: getMemoryTitle(memory),
+      subtitle: formatRelativeDate(memory.created_at),
+      badge: "Memory",
+      page: "memory" as AppPage,
+    }))
+    return [...githubActivity, ...notionActivity, ...memoryActivity].slice(0, MAX_ACTIVITY_ITEMS)
+  }, [github?.last_sync_at, memories, notion?.last_sync_at, notionItems, repoItems])
+
+  const insights = memories.slice(0, 4).map((memory) => ({
+    id: memory.id,
+    title: getMemoryTitle(memory),
+    time: formatRelativeDate(memory.created_at),
+  }))
+
+  const healthValues = [
+    projects.length,
+    projects.length + conversations.length,
+    conversations.length + memories.length,
+    totalKnowledgeItems,
+    totalKnowledgeItems + integrations.filter((item) => item.connected).length,
+    totalKnowledgeItems + notes,
+    totalKnowledgeItems + notes + conversations.length,
+  ].map((value) => Math.max(value, 1))
+
+  const suggestions = [
+    repoItems.length ? { title: "Review Recent Repositories", text: `${repoItems.length} repositories are available`, prompt: "Summarize my GitHub repositories." } : { title: "Connect GitHub", text: "Repository context is not connected", prompt: "Help me connect GitHub." },
+    notionItems.length ? { title: "Summarize Notion Workspace", text: `${notionItems.length} Notion items are visible`, prompt: "Use my Notion context and summarize my workspace structure." } : { title: "Connect Notion", text: "Workspace context is not connected", prompt: "Help me connect Notion." },
+    conversations.length ? { title: "Continue Recent Chat", text: conversations[0]?.title || "Recent conversation ready", prompt: "Continue my latest conversation." } : { title: "Ask CEASER", text: "Start a focused workspace chat", prompt: "Help me plan today's work." },
+    memories.length ? { title: "Search Memory", text: `${memories.length} memories available`, prompt: "Summarize my recent memory insights." } : { title: "Create Memory", text: "Save useful context from chat", prompt: "Create a memory for my current priorities." },
+  ]
 
   return (
-    <div className="flex h-full spatial-shell">
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {/* Header */}
-        <div className="spatial-panel-elevated mb-7 rounded-3xl p-6">
-          <p className="text-sm text-muted-foreground">Mission Control / {getUserDisplayName(readUserProfile())}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Your AI workforce is operational.</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Agents, memory, files, and workflows are arranged as one live operating layer.</p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          {/* Left Column */}
-          <div className="space-y-6">
-            {/* Stats Grid */}
-            <GlowCard>
-              <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setCurrentPage("projects")} className="text-left">
-                  <StatCard
-                    icon={<FolderKanban className="h-5 w-5 text-primary" />}
-                    label="Projects"
-                    value={stats.projects}
-                  />
-                </button>
-                <button onClick={() => setCurrentPage("mission-control")} className="text-left">
-                  <StatCard
-                    icon={<CheckSquare className="h-5 w-5 text-primary" />}
-                    label="Tasks"
-                    value={stats.tasks}
-                  />
-                </button>
-                <button onClick={() => setCurrentPage("memory")} className="text-left">
-                  <StatCard
-                    icon={<Target className="h-5 w-5 text-primary" />}
-                    label="Goal Memories"
-                    value={stats.goals}
-                  />
-                </button>
-                <button onClick={() => setCurrentPage("agents")} className="text-left">
-                  <StatCard
-                    icon={<Users className="h-5 w-5 text-primary" />}
-                    label="Agents Active"
-                    value={`${stats.agentsActive}/${stats.agentsTotal}`}
-                  />
+    <div className="min-h-full overflow-y-auto bg-[#020817] text-slate-100">
+      <div className="mx-auto grid max-w-[1740px] gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="space-y-5">
+          <section className="relative overflow-hidden rounded-3xl border border-cyan-300/10 bg-[#071323]/88 p-7 shadow-[0_30px_120px_rgba(15,23,42,.45)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_0%,rgba(124,58,237,.28),transparent_36%),radial-gradient(circle_at_82%_38%,rgba(14,165,233,.16),transparent_32%)]" />
+            <div className="relative flex flex-col gap-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="mb-3 flex items-center gap-2 text-sm text-emerald-300">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,.9)]" />
+                    {getGreeting()}, {firstName}
+                  </div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Your AI. Your Projects. Your Edge.</h1>
+                  <p className="mt-3 max-w-3xl text-sm text-slate-400">CEASER is processing, organizing and thinking ahead so you can focus on what matters.</p>
+                </div>
+                <button onClick={() => setCurrentPage("integrations")} className="rounded-2xl border border-cyan-300/10 bg-black/25 px-5 py-3 text-sm text-slate-200 shadow-inner transition hover:border-emerald-300/40">
+                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-400" />
+                  {allConnected ? "All Systems Active" : "Systems Ready"}
                 </button>
               </div>
-            </GlowCard>
-
-            {/* Active Agents Section */}
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                  Active Agents
-                </h2>
-                <button 
-                  onClick={() => setCurrentPage("agents")}
-                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  View All
-                </button>
+              <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+                {metricCards.map((card) => (
+                  <button key={card.label} onClick={() => setCurrentPage(card.page)} className="group rounded-2xl border border-cyan-300/12 bg-[#07111f]/80 p-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-[#0a1a2d]">
+                    <div className="mb-4 flex items-center justify-between text-slate-100">
+                      <span className="text-slate-300">{card.icon}</span>
+                      <span className="text-xs text-emerald-400">{card.delta}</span>
+                    </div>
+                    <p className="text-xs text-slate-400">{card.label}</p>
+                    <p className="mt-1 text-3xl font-semibold text-white">{card.value}</p>
+                    <p className="text-xs text-slate-500">{card.title}</p>
+                  </button>
+                ))}
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {activeAgents.map((agent) => {
-                  return (
-                    <GlowCard 
-                      key={agent.id} 
-                      hover 
-                      glowColor={agent.color}
-                      onClick={() => handleAgentClick(agent)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <AgentAvatar agent={agent} size="lg" showStatus showGlow enabled={isAgentEnabled(agent.id)} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold">{agent.name}</p>
-                            <span className="text-xs text-emerald-500">Active</span>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                            {agent.currentTask}
-                          </p>
-                        </div>
-                      </div>
-                    </GlowCard>
-                  )
-                })}
+            </div>
+          </section>
+
+          <div className="grid gap-5 xl:grid-cols-[.86fr_1.14fr]">
+            <Panel title="Recent Activity" action={<ViewAllButton page="integrations" />}>
+              <div className="space-y-1 p-4">
+                {isLoading && (
+                  <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[.03] p-4 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading live workspace activity...
+                  </div>
+                )}
+                {!isLoading && recentActivity.length === 0 && (
+                  <button onClick={() => setCurrentPage("integrations")} className="w-full rounded-xl border border-white/5 bg-white/[.03] p-4 text-left text-sm text-slate-400">
+                    Connect GitHub or Notion to see workspace activity here.
+                  </button>
+                )}
+                {recentActivity.map((item) => (
+                  <button key={item.id} onClick={() => setCurrentPage(item.page)} className="flex w-full items-center gap-4 rounded-xl p-3 text-left transition hover:bg-white/[.04]">
+                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/[.04] text-slate-200">{item.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-slate-100">{item.title}</span>
+                      <span className="block truncate text-xs text-slate-500">{item.subtitle}</span>
+                    </span>
+                    <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-xs text-emerald-300">+ {item.badge}</span>
+                  </button>
+                ))}
+              </div>
+            </Panel>
+
+            <div className="space-y-5">
+              <Panel title="Knowledge Overview">
+                <div className="grid gap-6 p-5 md:grid-cols-[220px_1fr]">
+                  <button onClick={() => setCurrentPage("memory")} className="relative mx-auto grid h-52 w-52 place-items-center rounded-full" style={{ background: buildConicGradient(knowledgeSegments) }}>
+                    <div className="absolute inset-4 rounded-full bg-[#081427] shadow-[inset_0_0_40px_rgba(0,0,0,.75)]" />
+                    <div className="relative text-center">
+                      <p className="text-4xl font-semibold text-white">{totalKnowledgeItems}</p>
+                      <p className="text-sm text-slate-400">Total Items</p>
+                    </div>
+                  </button>
+                  <div className="grid content-center gap-3">
+                    {knowledgeSegments.map((segment) => (
+                      <button key={segment.label} onClick={() => setCurrentPage(segment.page)} className="flex items-center justify-between rounded-xl px-2 py-1 text-left transition hover:bg-white/[.04]">
+                        <span className="flex items-center gap-3 text-sm text-slate-300">
+                          <span className="h-3 w-3 rounded" style={{ backgroundColor: segment.color }} />
+                          {segment.label}
+                        </span>
+                        <span className="text-sm text-slate-400">
+                          {segment.value} ({totalKnowledgeItems ? Math.round((segment.value / totalKnowledgeItems) * 100) : 0}%)
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Panel>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Panel title="Connections" action={<ViewAllButton page="integrations" />}>
+                  <div className="space-y-3 p-5">
+                    {[
+                      { name: "GitHub", icon: <Github className="h-9 w-9" />, record: github },
+                      { name: "Notion", icon: <NotebookText className="h-9 w-9" />, record: notion },
+                    ].map((item) => (
+                      <button key={item.name} onClick={() => setCurrentPage("integrations")} className="flex w-full items-center gap-4 rounded-2xl border border-white/5 bg-white/[.025] p-4 text-left transition hover:border-cyan-300/30">
+                        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-slate-950">{item.icon}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold text-white">{item.name}</span>
+                          <span className={`block text-xs ${item.record?.connected ? "text-emerald-400" : "text-slate-500"}`}>{item.record?.connected ? "Connected" : "Not connected"}</span>
+                          <span className="block text-xs text-slate-500">Last sync: {formatRelativeDate(item.record?.last_sync_at)}</span>
+                        </span>
+                        <ChevronRight className="h-5 w-5 text-slate-500" />
+                      </button>
+                    ))}
+                  </div>
+                </Panel>
+
+                <Panel title="AI Suggestions">
+                  <div className="grid gap-3 p-5 sm:grid-cols-2">
+                    {suggestions.map((suggestion) => (
+                      <button key={suggestion.title} onClick={() => startNewChatWithPrompt(suggestion.prompt)} className="rounded-2xl border border-white/5 bg-white/[.025] p-4 text-left transition hover:border-purple-300/35 hover:bg-white/[.05]">
+                        <p className="text-sm font-semibold text-slate-100">{suggestion.title}</p>
+                        <p className="mt-2 line-clamp-2 text-xs text-slate-400">{suggestion.text}</p>
+                        <ChevronRight className="mt-3 h-4 w-4 text-blue-300" />
+                      </button>
+                    ))}
+                  </div>
+                </Panel>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Orbital Visualization */}
-          <div className="relative min-h-[520px] xl:min-h-[600px]">
-            <OrbitalVisualization
-              className="h-full w-full"
-              selectedAgentId={selectedAgentId}
-              onAgentClick={handleAgentClick}
-            />
-            {openingAgentId && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 8 }}
-                transition={{ type: "spring", stiffness: 240, damping: 22 }}
-                className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center"
-              >
-                {(() => {
-                  const popupAgent = agents.find((agent) => agent.id === openingAgentId)
-                  if (!popupAgent) return null
-                  return (
-                    <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/15 bg-[#0b1224]/92 px-6 py-5 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl">
-                      <AgentAvatar agent={popupAgent} size="lg" showStatus showGlow enabled={isAgentEnabled(popupAgent.id)} />
-                      <div className="text-center">
-                        <p className="text-sm font-semibold">{popupAgent.name}</p>
-                        <p className="text-xs text-muted-foreground">Opening agent screen...</p>
-                      </div>
-                    </div>
-                  )
-                })()}
-              </motion.div>
-            )}
-          </div>
-        </div>
-      </div>
+          <Panel title="Quick Actions">
+            <div className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                { label: "Search Knowledge", icon: <Search className="h-5 w-5" />, action: () => setCurrentPage("memory") },
+                { label: "Explain Repository", icon: <Github className="h-5 w-5" />, action: () => startNewChatWithPrompt("Explain my most active GitHub repository.") },
+                { label: "Create Notes", icon: <NotebookText className="h-5 w-5" />, action: () => setCurrentPage("memory") },
+                { label: "Generate Study Plan", icon: <CalendarDays className="h-5 w-5" />, action: () => startNewChatWithPrompt("Generate a study plan from my current workspace context.") },
+                { label: "Summarize Commits", icon: <Code2 className="h-5 w-5" />, action: () => startNewChatWithPrompt("Summarize my recent GitHub commits.") },
+                { label: "Ask CEASER", icon: <Sparkles className="h-5 w-5" />, action: () => setIsSearchOpen(true) },
+              ].map((action) => (
+                <button key={action.label} onClick={action.action} className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/10 bg-[#091627] px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-cyan-300/35 hover:bg-[#0c1d32]">
+                  {action.icon}
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </Panel>
 
-      {/* Right Sidebar */}
-      <aside className="spatial-panel m-4 ml-0 hidden max-h-[calc(100vh-2rem)] w-80 flex-shrink-0 overflow-y-auto rounded-3xl p-4 xl:block">
-        {/* Memory Section */}
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Memory
-            </h2>
-            <button 
-              onClick={() => setCurrentPage("memory")}
-              className="text-sm text-primary hover:underline"
-            >
-              View All
-            </button>
-          </div>
-          <div className="space-y-2">
-            {isRailLoading && (
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading live memory...
+          <p className="pb-2 text-center text-sm text-slate-500">
+            <span className="text-cyan-400">Connecting knowledge.</span> Empowering ideas. Building the future.
+          </p>
+        </main>
+
+        <aside className="space-y-4">
+          <Panel title="Memory Insights" action={<ViewAllButton page="memory" />}>
+            <div className="space-y-1 p-4">
+              {isLoading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-500" />}
+              {!isLoading && insights.length === 0 && <p className="rounded-xl border border-white/5 bg-white/[.03] p-4 text-sm text-slate-400">No memory insights yet.</p>}
+              {insights.map((insight) => (
+                <button key={insight.id} onClick={() => setCurrentPage("memory")} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-white/[.04]">
+                  <Clock3 className="h-4 w-4 text-slate-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-100">{insight.title}</span>
+                    <span className="text-xs text-slate-500">{insight.time}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="Recent Chats" action={<ViewAllButton page="chat" />}>
+            <div className="space-y-1 p-4">
+              {!isLoading && conversations.length === 0 && <p className="rounded-xl border border-white/5 bg-white/[.03] p-4 text-sm text-slate-400">No recent chats yet.</p>}
+              {conversations.slice(0, 4).map((conversation) => (
+                <button key={conversation.id} onClick={() => setCurrentPage("chat")} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-white/[.04]">
+                  <MessageSquareText className="h-4 w-4 text-blue-300" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-100">{conversation.title}</span>
+                    <span className="text-xs text-slate-500">{formatRelativeDate(conversation.created_at)}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="System Health">
+            <div className="space-y-3 p-5">
+              {[
+                { label: "Integrations", value: allConnected ? "All Connected" : `${integrations.filter((item) => item.connected).length} Connected`, icon: <ShieldCheck className="h-4 w-4" />, good: allConnected },
+                { label: "Memory Usage", value: memories.length ? "Optimal" : "Ready", icon: <Layers3 className="h-4 w-4" />, good: true },
+                { label: "Sync Status", value: integrations.some((item) => item.last_sync_at) ? "Up to date" : "Ready to sync", icon: <SquareCheckBig className="h-4 w-4" />, good: true },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-slate-400">{row.icon}{row.label}</span>
+                  <span className={row.good ? "text-emerald-400" : "text-amber-300"}>{row.value}</span>
+                </div>
+              ))}
+              <Sparkline values={healthValues} />
+              <div className="flex justify-between text-[10px] text-slate-600">
+                <span>24h</span>
+                <span>12h</span>
+                <span>Now</span>
               </div>
-            )}
-            {!isRailLoading && memories.slice(0, 4).map((memory) => (
-              <button 
-                key={memory.id} 
-                onClick={() => setCurrentPage("memory")}
-                className="flex w-full items-start gap-3 rounded-lg p-2 text-left transition-colors hover:bg-secondary/50"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/50">
-                  {memory.memory_type === "goal" && <Target className="h-5 w-5 text-primary" />}
-                  {memory.memory_type === "conversation" && <Users className="h-5 w-5 text-muted-foreground" />}
-                  {memory.memory_type === "file" && <FileText className="h-5 w-5 text-muted-foreground" />}
-                  {memory.memory_type === "research" && <Search className="h-5 w-5 text-muted-foreground" />}
-                  {!["goal", "conversation", "file", "research"].includes(memory.memory_type) && (
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="line-clamp-1 text-sm font-medium">{getMemoryTitle(memory)}</p>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{getMemoryDescription(memory)}</p>
-                </div>
-              </button>
-            ))}
-            {!isRailLoading && memories.length === 0 && (
-              <button onClick={() => setCurrentPage("memory")} className="w-full rounded-xl border border-border bg-secondary/40 p-4 text-left text-sm text-muted-foreground transition hover:bg-secondary/70">
-                No memories yet. Create one from chat or the Memory screen.
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Projects Section */}
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Recent Projects
-            </h2>
-            <button 
-              onClick={() => setCurrentPage("projects")}
-              className="text-sm text-primary hover:underline"
-            >
-              View All
-            </button>
-          </div>
-          <div className="space-y-2">
-            {projects.slice(0, 4).map((project) => (
-              <button 
-                key={project.id}
-                onClick={() => setCurrentPage("projects")}
-                className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-secondary/50"
-              >
-                <FolderKanban className="h-4 w-4 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <p className="line-clamp-1 text-sm font-medium">{project.name}</p>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{project.status}</p>
-                </div>
-                <span className="text-xs text-primary whitespace-nowrap">
-                  {project.updated_at ? new Date(project.updated_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "Project"}
-                </span>
-              </button>
-            ))}
-            {!isRailLoading && projects.length === 0 && (
-              <button onClick={() => setCurrentPage("projects")} className="w-full rounded-xl border border-border bg-secondary/40 p-4 text-left text-sm text-muted-foreground transition hover:bg-secondary/70">
-                No projects yet. Create one to organize your work.
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Chats Section */}
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Recent Chats
-            </h2>
-            <button 
-              onClick={() => setCurrentPage("chat")}
-              className="text-sm text-primary hover:underline"
-            >
-              View All
-            </button>
-          </div>
-          <div className="space-y-2">
-            {conversations.slice(0, 3).map((conversation) => (
-              <button 
-                key={conversation.id}
-                onClick={() => setCurrentPage("chat")} 
-                className="flex w-full items-start gap-3 rounded-lg bg-secondary/30 p-3 text-left transition-colors hover:bg-secondary/50"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="line-clamp-1 font-medium">{conversation.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Created {conversation.created_at ? new Date(conversation.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "recently"}
-                  </p>
-                </div>
-              </button>
-            ))}
-            {!isRailLoading && conversations.length === 0 && (
-              <button onClick={() => setCurrentPage("chat")} className="w-full rounded-xl border border-border bg-secondary/40 p-4 text-left text-sm text-muted-foreground transition hover:bg-secondary/70">
-                No chats yet. Start a conversation with CEASER.
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
+            </div>
+          </Panel>
+        </aside>
+      </div>
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-

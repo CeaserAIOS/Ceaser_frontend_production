@@ -293,6 +293,9 @@ export async function apiStreamRequest(
 function canCache(path: string) {
   if (typeof window === "undefined") return false
   if (path.startsWith("/auth/")) return false
+  // Chat turns change while an answer is streaming. A cached history can show
+  // only the user prompt after refresh and hide the saved assistant response.
+  if (/^\/chat\/conversations\/[^/]+\/messages(?:\?|$)/.test(path)) return false
   return [
     "/agents",
     "/agent-workbenches",

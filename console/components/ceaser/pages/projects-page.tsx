@@ -67,7 +67,7 @@ const statusCopy: Record<ProjectStatus, string> = {
 const projectAccent = ["#7c3aed", "#3b82f6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"]
 
 export function ProjectsPage() {
-  const { confirmDialog, promptDialog, setCurrentPage, setIsVoiceModalOpen, setSelectedAgentId } = useApp()
+  const { confirmDialog, promptDialog, setCurrentPage, setIsVoiceModalOpen, setSelectedAgentId, startNewChatWithPrompt } = useApp()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [files, setFiles] = useState<FileRecord[]>([])
   const [drafts, setDrafts] = useState<DraftRecord[]>([])
@@ -224,8 +224,7 @@ export function ProjectsPage() {
       "Create a practical, detailed document with numbered phases, tasks, owners, dependencies, deadlines, risks, success checks, and measurable next actions.",
     ].filter(Boolean)
 
-    window.localStorage.setItem("ceaser_chat_seed", sections.join("\n\n"))
-    window.localStorage.setItem("ceaser_chat_autosend", "true")
+    startNewChatWithPrompt(sections.join("\n\n"))
     setIsWorkflowModalOpen(false)
     setWorkflowForm({ goal: "", phases: "", owners: "", dependencies: "", deadlines: "", risks: "", successChecks: "" })
     setCurrentPage("chat")

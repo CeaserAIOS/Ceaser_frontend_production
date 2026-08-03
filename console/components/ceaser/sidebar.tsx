@@ -12,7 +12,6 @@ import { ceaserAgents, navigationItems } from "@/lib/ceaser"
 import { adminApi } from "@/lib/api/admin"
 import { AgentAvatar } from "./agent-avatar"
 import { cn } from "@/lib/utils"
-import { Plus } from "lucide-react"
 
 export function Sidebar() {
   const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed, theme } = useApp()
@@ -132,10 +131,6 @@ export function Sidebar() {
                   </div>
                 </button>
               ))}
-              <button className="flex w-full items-center gap-3 rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-primary">
-                <Plus className="h-4 w-4" />
-                <span>Add New Agent</span>
-              </button>
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
 
 type DialogTone = "default" | "danger"
 type AppTheme = "dark" | "light"
+type PendingChatRequest = { id: string; prompt: string }
 type DialogRequest =
   | {
       type: "confirm"
@@ -42,6 +43,9 @@ interface AppState {
   setSidebarCollapsed: (collapsed: boolean) => void
   theme: AppTheme
   setTheme: (theme: AppTheme) => void
+  pendingChatRequest: PendingChatRequest | null
+  startNewChatWithPrompt: (prompt: string) => void
+  clearPendingChatRequest: () => void
   confirmDialog: (request: Omit<Extract<DialogRequest, { type: "confirm" }>, "type">) => Promise<boolean>
   promptDialog: (request: Omit<Extract<DialogRequest, { type: "prompt" }>, "type">) => Promise<string | null>
 }
@@ -57,6 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [configAgentId, setConfigAgentId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [theme, setThemeState] = useState<AppTheme>("dark")
+  const [pendingChatRequest, setPendingChatRequest] = useState<PendingChatRequest | null>(null)
   const [dialog, setDialog] = useState<DialogRequest | null>(null)
   const [promptValue, setPromptValue] = useState("")
   const dialogResolver = useRef<((value: boolean | string | null) => void) | null>(null)
@@ -107,6 +112,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   const setTheme = (nextTheme: AppTheme) => setThemeState(nextTheme)
+  const startNewChatWithPrompt = (prompt: string) => {
+    const trimmedPrompt = prompt.trim()
+    if (!trimmedPrompt) return
+    setPendingChatRequest({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, prompt: trimmedPrompt })
+  }
+  const clearPendingChatRequest = () => setPendingChatRequest(null)
 
   return (
     <AppContext.Provider
@@ -127,6 +138,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSidebarCollapsed,
         theme,
         setTheme,
+        pendingChatRequest,
+        startNewChatWithPrompt,
+        clearPendingChatRequest,
         confirmDialog,
         promptDialog,
       }}

@@ -201,7 +201,7 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
 }
 
 export function ChatPage() {
-  const { setCurrentPage, confirmDialog, promptDialog, theme } = useApp()
+  const { setCurrentPage, confirmDialog, promptDialog, theme, pendingChatRequest, clearPendingChatRequest } = useApp()
   const [displayName, setDisplayName] = useState("there")
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -232,11 +232,17 @@ export function ChatPage() {
   const streamAbortRef = useRef<AbortController | null>(null)
   const streamSessionRef = useRef(0)
   const autoSendSeedRef = useRef(false)
+  const processedChatRequestRef = useRef<string | null>(null)
+  const isProgrammaticScrollRef = useRef(false)
 
   const captureScrollPosition = useCallback(() => {
     const container = chatScrollRef.current
-    if (!container) return
+    if (!container || isProgrammaticScrollRef.current) return
     shouldFollowStreamRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+  }, [])
+
+  const stopFollowingStream = useCallback(() => {
+    shouldFollowStreamRef.current = false
   }, [])
 
   const latestAssistantIntel = useMemo(
@@ -343,8 +349,11 @@ export function ChatPage() {
   useEffect(() => {
     const boot = async () => {
       setIsBooting(true)
-      preferredConversationRef.current = window.localStorage.getItem(ACTIVE_CONVERSATION_KEY)
       const seed = window.localStorage.getItem("ceaser_chat_seed")
+      // A workflow request must always open a new conversation. Do not let the
+      // asynchronous conversation-list load restore an older chat over it.
+      const startsNewChat = Boolean(pendingChatRequest || seed)
+      preferredConversationRef.current = startsNewChat ? null : window.localStorage.getItem(ACTIVE_CONVERSATION_KEY)
       if (seed) {
         setInput(seed)
         window.localStorage.removeItem("ceaser_chat_seed")
@@ -373,7 +382,11 @@ export function ChatPage() {
   useEffect(() => {
     const container = chatScrollRef.current
     if (!container || !shouldFollowStreamRef.current) return
+    isProgrammaticScrollRef.current = true
     container.scrollTop = container.scrollHeight
+    requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = false
+    })
   }, [messages])
 
   useEffect(() => {
@@ -615,7 +628,6 @@ export function ChatPage() {
           },
           onToken: (text) => {
             if (streamSessionRef.current !== streamSessionId) return
-            captureScrollPosition()
             if (firstTokenAt === null) {
               firstTokenAt = performance.now()
               console.info("[CEASER LATENCY] frontend_first_token_ms", Math.round(firstTokenAt - clientStreamStartedAt))
@@ -703,6 +715,16 @@ export function ChatPage() {
     autoSendSeedRef.current = false
     void handleSend()
   }, [input, isBooting, isLoading])
+
+  useEffect(() => {
+    if (!pendingChatRequest || isBooting || isLoading || processedChatRequestRef.current === pendingChatRequest.id) return
+    processedChatRequestRef.current = pendingChatRequest.id
+    clearPendingChatRequest()
+    void (async () => {
+      await handleNewChat()
+      await handleSend(pendingChatRequest.prompt, true)
+    })()
+  }, [pendingChatRequest, isBooting, isLoading])
 
   const handleEditSentMessage = async (message: Message) => {
     const updated = (await promptDialog({
@@ -967,6 +989,8 @@ export function ChatPage() {
           <div
             ref={chatScrollRef}
             onScroll={captureScrollPosition}
+            onWheel={stopFollowingStream}
+            onTouchStart={stopFollowingStream}
             className={cn("min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[17vh]")}
           >
             {loadError && (

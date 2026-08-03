@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 import {
   Calendar,
   Check,
-  ChevronRight,
   Database,
   FileText,
   Github,
@@ -16,35 +15,30 @@ import {
   Loader2,
   Lock,
   Mail,
-  MessageSquare,
   MoreHorizontal,
   RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
   Tag,
-  Unplug,
   Users,
 } from "lucide-react"
 
 type Filter = "all" | "connected" | "available"
 
-const liveProviders = new Set<string>(["notion"])
+const liveProviders = new Set<string>(["notion", "github"])
 const launchMessage = "Prepared for verified access after launch."
 
 const fallbackProviders: IntegrationRecord[] = [
+  providerStub("notion", "Notion", "Connect your pages, databases, and knowledge workspace.", "not_connected"),
+  providerStub("github", "GitHub", "Connect repositories, READMEs, commits, issues, and pull requests.", "not_connected"),
   providerStub("gmail", "Gmail", "Email assistance prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-calendar", "Google Calendar", "Calendar intelligence prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-drive", "Google Drive", "Drive file context prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-tasks", "Google Tasks", "Task sync prepared for verified Google Workspace access.", "coming_soon"),
   providerStub("google-classroom", "Google Classroom", "Academic workspace sync prepared for verified Google access.", "coming_soon"),
-  providerStub("notion", "Notion", "Connect your pages, databases, and knowledge workspace.", "not_connected"),
-  providerStub("slack", "Slack", "Send messages and get updates in Slack.", "coming_soon"),
   providerStub("microsoft-outlook", "Microsoft Outlook", "Sync emails, contacts and calendar.", "coming_soon"),
-  providerStub("github", "GitHub", "Connect repos and track activity.", "coming_soon"),
   providerStub("microsoft-teams", "Microsoft Teams", "Collaborate and get updates in Teams.", "coming_soon"),
-  providerStub("dropbox", "Dropbox", "Access and share your files in Dropbox.", "coming_soon"),
-  providerStub("linear", "Linear", "Sync issues and project updates.", "coming_soon"),
 ]
 
 export function IntegrationsPage() {
@@ -173,11 +167,12 @@ export function IntegrationsPage() {
     return mergeFallbacks(integrations, optimisticConnected)
   }, [integrations, optimisticConnected])
 
-  const selected = allIntegrations.find((item) => item.id === selectedId) || allIntegrations[0]
+  const orderedIntegrations = useMemo(() => sortIntegrations(allIntegrations), [allIntegrations])
+  const selected = orderedIntegrations.find((item) => item.id === selectedId) || orderedIntegrations[0]
   const connectedCount = allIntegrations.filter((item) => item.connected).length
   const availableCount = allIntegrations.filter((item) => !item.connected).length
 
-  const filtered = allIntegrations.filter((item) => {
+  const filtered = orderedIntegrations.filter((item) => {
     const matchesQuery = `${item.name} ${item.description}`.toLowerCase().includes(query.toLowerCase())
     const matchesFilter =
       filter === "all" ||
@@ -271,8 +266,8 @@ export function IntegrationsPage() {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className="rounded-xl bg-white/10 px-5 py-2 text-sm font-semibold text-muted-foreground transition disabled:cursor-not-allowed disabled:opacity-80">
-                      Prepared
+                    <button onClick={() => void connect(selected.id)} disabled={!liveProviders.has(selected.id) || busyProvider === selected.id} className={cn("rounded-xl px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70", liveProviders.has(selected.id) ? "bg-gradient-to-r from-blue-500 to-violet-600 text-white hover:opacity-95" : "bg-white/10 text-muted-foreground")}>
+                      {liveProviders.has(selected.id) ? "Connect" : "Prepared"}
                     </button>
                   )}
                 </div>
@@ -367,12 +362,9 @@ function IntegrationLogo({ id, large = false }: { id: string; large?: boolean })
   if (id === "google-tasks") return <div className={cn(base, size, "bg-blue-500/20 text-blue-300")}><Check className={iconClass} /></div>
   if (id === "google-classroom") return <div className={cn(base, size, "bg-emerald-500/20 text-emerald-300")}><Users className={iconClass} /></div>
   if (id === "notion") return <div className={cn(base, size, "bg-white text-black")}><span className="font-black">N</span></div>
-  if (id === "slack") return <div className={cn(base, size, "bg-[#171717] text-white")}><MessageSquare className={iconClass} /></div>
   if (id === "microsoft-outlook") return <div className={cn(base, size, "bg-blue-500 text-white")}><Inbox className={iconClass} /></div>
   if (id === "github") return <div className={cn(base, size, "bg-white text-black")}><Github className={iconClass} /></div>
   if (id === "microsoft-teams") return <div className={cn(base, size, "bg-violet-500 text-white")}><Users className={iconClass} /></div>
-  if (id === "dropbox") return <div className={cn(base, size, "bg-blue-600 text-white")}><Database className={iconClass} /></div>
-  if (id === "linear") return <div className={cn(base, size, "bg-violet-500 text-white")}><Sparkles className={iconClass} /></div>
   return <div className={cn(base, size, "bg-primary/20 text-primary")}><KeyRound className={iconClass} /></div>
 }
 
@@ -427,6 +419,7 @@ function permissionLabels(integration: IntegrationRecord) {
   if (integration.id === "google-tasks") return ["Read task lists", "Read tasks and due dates", "Access profile info"]
   if (integration.id === "google-classroom") return ["Read courses", "Read coursework", "Read assignments and due dates"]
   if (integration.id === "notion") return ["Read pages", "Read databases", "Read workspace metadata"]
+  if (integration.id === "github") return ["Read repository metadata", "Read repository contents", "Read issues and pull requests"]
   return ["Read account metadata", "Use connection status", "Access profile info"]
 }
 
@@ -455,6 +448,13 @@ function featureLabels(integration: IntegrationRecord) {
       { title: "Knowledge Search", detail: "Use Notion pages as workspace context", icon: <Search className="h-3.5 w-3.5" /> },
       { title: "Database Awareness", detail: "Read shared databases and page metadata", icon: <Database className="h-3.5 w-3.5" /> },
       { title: "Secure Read Mode", detail: "CEASER reads approved content only", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+    ]
+  }
+  if (integration.id === "github") {
+    return [
+      { title: "Repository Overview", detail: "List visible repositories and metadata", icon: <Github className="h-3.5 w-3.5" /> },
+      { title: "README Analysis", detail: "Explain connected repository READMEs", icon: <FileText className="h-3.5 w-3.5" /> },
+      { title: "Issues and PRs", detail: "Summarize open work from GitHub", icon: <Sparkles className="h-3.5 w-3.5" /> },
     ]
   }
   return [
@@ -489,7 +489,7 @@ function mergeFallbacks(records: IntegrationRecord[], connectedOverrides = new S
       status: "connected",
     })
   }
-  return Array.from(byId.values())
+  return sortIntegrations(Array.from(byId.values()))
 }
 
 function upsertIntegration(records: IntegrationRecord[], id: string, updates: Partial<IntegrationRecord>) {
@@ -501,6 +501,16 @@ function upsertIntegration(records: IntegrationRecord[], id: string, updates: Pa
 
 function providerName(id: string) {
   return fallbackProviders.find((item) => item.id === id)?.name || id
+}
+
+function sortIntegrations(records: IntegrationRecord[]) {
+  return [...records]
+    .filter((item) => !["slack", "dropbox", "linear"].includes(item.id))
+    .sort((a, b) => {
+      const rank = (item: IntegrationRecord) => item.connected ? 0 : liveProviders.has(item.id) ? 1 : 2
+      const rankDelta = rank(a) - rank(b)
+      return rankDelta || a.name.localeCompare(b.name)
+    })
 }
 
 function formatDate(value?: string | null) {

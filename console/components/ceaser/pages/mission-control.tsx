@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { AppPage } from "@/lib/ceaser"
 import { useApp } from "@/lib/app-context"
+import { agents } from "@/lib/data"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
+import { AgentAvatar } from "../agent-avatar"
 import {
   BookOpen,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
   CircleDot,
@@ -24,10 +25,9 @@ import {
   Loader2,
   MessageSquareText,
   NotebookText,
-  Search,
   ShieldCheck,
-  Sparkles,
   SquareCheckBig,
+  X,
 } from "lucide-react"
 
 type AnyRecord = Record<string, unknown>
@@ -37,8 +37,12 @@ type KnowledgeSegment = {
   label: string
   value: number
   color: string
-  page: AppPage
+  detailKey: DetailKey
 }
+
+type DetailKey = "repositories" | "commits" | "issues" | "pull_requests" | "pages" | "databases" | "notes"
+type DetailRow = { id: string; title: string; subtitle?: string; meta?: string }
+type DetailModal = { title: string; rows: DetailRow[] } | null
 
 const MAX_ACTIVITY_ITEMS = 5
 const MISSION_CACHE_KEY = "ceaser_mission_control_cache_v1"
@@ -133,6 +137,22 @@ function formatRelativeDate(value?: string | null) {
 function getMemoryTitle(memory: MemoryRecord) {
   const metadata = asRecord(memory.metadata ?? memory.extra_metadata)
   return readString(metadata.title) || memory.content.split("\n")[0]?.replace(/^#+\s*/, "").slice(0, 72) || "Memory"
+}
+
+function getMemorySubtitle(memory: MemoryRecord) {
+  return `${memory.memory_type} memory - ${formatRelativeDate(memory.created_at)}`
+}
+
+function getGithubChildRows(repos: AnyRecord[], key: "commits" | "issues" | "pull_requests"): DetailRow[] {
+  return repos.flatMap((repo) => {
+    const repoName = getRepoName(repo)
+    return asArray(repo[key]).map((item, index) => ({
+      id: `${key}-${repoName}-${readString(item.sha) || readString(item.number) || index}`,
+      title: readString(item.message) || readString(item.title) || `${repoName} item`,
+      subtitle: repoName,
+      meta: readString(item.author) || readString(item.state) || formatRelativeDate(readString(item.date)),
+    }))
+  })
 }
 
 function getGreeting() {
@@ -243,6 +263,38 @@ function ViewAllButton({ page }: { page: AppPage }) {
   )
 }
 
+function DetailPopup({ detail, onClose }: { detail: DetailModal; onClose: () => void }) {
+  if (!detail) return null
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm" onClick={onClose}>
+      <section className="w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-300/15 bg-[#071323] shadow-[0_30px_120px_rgba(0,0,0,.58)]" onClick={(event) => event.stopPropagation()}>
+        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-white">{detail.title}</h2>
+            <p className="text-xs text-slate-500">{detail.rows.length} live item{detail.rows.length === 1 ? "" : "s"}</p>
+          </div>
+          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-slate-300 transition hover:border-cyan-300/40 hover:text-white" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="max-h-[420px] space-y-2 overflow-y-auto p-4">
+          {detail.rows.length === 0 ? (
+            <p className="rounded-2xl border border-white/5 bg-white/[.03] p-4 text-sm text-slate-400">No synced data available for this section yet.</p>
+          ) : (
+            detail.rows.map((row) => (
+              <article key={row.id} className="rounded-2xl border border-white/5 bg-white/[.035] p-4">
+                <h3 className="line-clamp-2 text-sm font-semibold text-slate-100">{row.title}</h3>
+                {row.subtitle && <p className="mt-1 line-clamp-2 text-xs text-slate-400">{row.subtitle}</p>}
+                {row.meta && <p className="mt-2 text-xs text-cyan-300">{row.meta}</p>}
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return new Promise((resolve) => {
     const timer = window.setTimeout(() => resolve(fallback), LIVE_DATA_TIMEOUT_MS)
@@ -271,13 +323,14 @@ function writeMissionCache(data: MissionCache) {
 }
 
 export function MissionControl() {
-  const { setCurrentPage, setIsSearchOpen, startNewChatWithPrompt } = useApp()
+  const { setCurrentPage, startNewChatWithPrompt } = useApp()
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [memories, setMemories] = useState<MemoryRecord[]>([])
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isIntegrationRefreshing, setIsIntegrationRefreshing] = useState(true)
+  const [detailModal, setDetailModal] = useState<DetailModal>(null)
 
   useEffect(() => {
     let mounted = true
@@ -347,26 +400,67 @@ export function MissionControl() {
   const pullRequests = repoItems.reduce((sum, repo) => sum + asArray(repo.pull_requests).length + readNumber(repo.pull_request_count), 0)
   const notes = memories.length + notionPages.length
   const allConnected = Boolean(github?.connected) && Boolean(notion?.connected)
+  const detailRows: Record<DetailKey, DetailRow[]> = {
+    repositories: repoItems.map((repo) => ({
+      id: `repo-${readString(repo.id) || getRepoName(repo)}`,
+      title: getRepoName(repo),
+      subtitle: readString(repo.description, "No description available"),
+      meta: [readString(repo.language), readString(repo.private) ? "Private" : "Public", formatRelativeDate(readString(repo.updated_at))].filter(Boolean).join(" - "),
+    })),
+    commits: getGithubChildRows(repoItems, "commits"),
+    issues: getGithubChildRows(repoItems, "issues"),
+    pull_requests: getGithubChildRows(repoItems, "pull_requests"),
+    pages: notionPages.map((page) => ({
+      id: `page-${readString(page.id) || getItemTitle(page)}`,
+      title: getItemTitle(page),
+      subtitle: readString(page.content_preview) || readString(page.preview) || readString(page.url),
+      meta: "Notion page",
+    })),
+    databases: notionDatabases.map((database) => ({
+      id: `database-${readString(database.id) || getItemTitle(database)}`,
+      title: getItemTitle(database),
+      subtitle: readString(database.description) || readString(database.url),
+      meta: "Notion database",
+    })),
+    notes: [
+      ...memories.map((memory) => ({
+        id: `memory-${memory.id}`,
+        title: getMemoryTitle(memory),
+        subtitle: memory.content.slice(0, 180),
+        meta: getMemorySubtitle(memory),
+      })),
+      ...notionPages.map((page) => ({
+        id: `note-page-${readString(page.id) || getItemTitle(page)}`,
+        title: getItemTitle(page),
+        subtitle: readString(page.content_preview) || readString(page.preview),
+        meta: "Notion page",
+      })),
+    ],
+  }
+
+  const openDetail = (key: DetailKey, title: string) => {
+    setDetailModal({ title, rows: detailRows[key] })
+  }
 
   const knowledgeSegments: KnowledgeSegment[] = [
-    { label: "Repositories", value: repoItems.length, color: "#2563eb", page: "integrations" },
-    { label: "Pages", value: notionPages.length, color: "#14b8a6", page: "integrations" },
-    { label: "Notes", value: notes, color: "#a855f7", page: "memory" },
-    { label: "Databases", value: notionDatabases.length, color: "#22d3ee", page: "integrations" },
-    { label: "Commits", value: commits, color: "#f97316", page: "integrations" },
-    { label: "Issues", value: issues, color: "#f59e0b", page: "integrations" },
-    { label: "Pull Requests", value: pullRequests, color: "#3b82f6", page: "integrations" },
+    { label: "Repositories", value: repoItems.length, color: "#2563eb", detailKey: "repositories" },
+    { label: "Pages", value: notionPages.length, color: "#14b8a6", detailKey: "pages" },
+    { label: "Notes", value: notes, color: "#a855f7", detailKey: "notes" },
+    { label: "Databases", value: notionDatabases.length, color: "#22d3ee", detailKey: "databases" },
+    { label: "Commits", value: commits, color: "#f97316", detailKey: "commits" },
+    { label: "Issues", value: issues, color: "#f59e0b", detailKey: "issues" },
+    { label: "Pull Requests", value: pullRequests, color: "#3b82f6", detailKey: "pull_requests" },
   ]
   const totalKnowledgeItems = knowledgeSegments.reduce((sum, segment) => sum + segment.value, 0)
 
   const metricCards = [
-    { label: "GitHub", title: "Repositories", value: repoItems.length, delta: repoItems.length ? `+${Math.min(repoItems.length, 9)}` : "0", icon: <Github className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Commits", title: "Recent", value: commits, delta: commits ? `+${Math.min(commits, 18)}` : "0", icon: <Code2 className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Issues", title: "Open", value: issues, delta: issues ? `${issues}` : "0", icon: <CircleDot className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Pull Requests", title: "Open", value: pullRequests, delta: pullRequests ? `+${pullRequests}` : "0", icon: <GitPullRequest className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Notion", title: "Pages", value: notionPages.length, delta: notionPages.length ? `+${Math.min(notionPages.length, 9)}` : "0", icon: <NotebookText className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Databases", title: "Databases", value: notionDatabases.length, delta: notionDatabases.length ? `+${notionDatabases.length}` : "0", icon: <Database className="h-7 w-7" />, page: "integrations" as AppPage },
-    { label: "Notes", title: "Knowledge", value: notes, delta: notes ? `+${Math.min(notes, 12)}` : "0", icon: <FileText className="h-7 w-7" />, page: "memory" as AppPage },
+    { label: "GitHub", title: "Repositories", value: repoItems.length, delta: repoItems.length ? `+${Math.min(repoItems.length, 9)}` : "0", icon: <Github className="h-7 w-7" />, detailKey: "repositories" as DetailKey },
+    { label: "Commits", title: "Recent", value: commits, delta: commits ? `+${Math.min(commits, 18)}` : "0", icon: <Code2 className="h-7 w-7" />, detailKey: "commits" as DetailKey },
+    { label: "Issues", title: "Open", value: issues, delta: issues ? `${issues}` : "0", icon: <CircleDot className="h-7 w-7" />, detailKey: "issues" as DetailKey },
+    { label: "Pull Requests", title: "Open", value: pullRequests, delta: pullRequests ? `+${pullRequests}` : "0", icon: <GitPullRequest className="h-7 w-7" />, detailKey: "pull_requests" as DetailKey },
+    { label: "Notion", title: "Pages", value: notionPages.length, delta: notionPages.length ? `+${Math.min(notionPages.length, 9)}` : "0", icon: <NotebookText className="h-7 w-7" />, detailKey: "pages" as DetailKey },
+    { label: "Databases", title: "Databases", value: notionDatabases.length, delta: notionDatabases.length ? `+${notionDatabases.length}` : "0", icon: <Database className="h-7 w-7" />, detailKey: "databases" as DetailKey },
+    { label: "Notes", title: "Knowledge", value: notes, delta: notes ? `+${Math.min(notes, 12)}` : "0", icon: <FileText className="h-7 w-7" />, detailKey: "notes" as DetailKey },
   ]
 
   const recentActivity = useMemo(() => {
@@ -419,9 +513,14 @@ export function MissionControl() {
     conversations.length ? { title: "Continue Recent Chat", text: conversations[0]?.title || "Recent conversation ready", prompt: "Continue my latest conversation." } : { title: "Ask CEASER", text: "Start a focused workspace chat", prompt: "Help me plan today's work." },
     memories.length ? { title: "Search Memory", text: `${memories.length} memories available`, prompt: "Summarize my recent memory insights." } : { title: "Create Memory", text: "Save useful context from chat", prompt: "Create a memory for my current priorities." },
   ]
+  const openSuggestion = (prompt: string) => {
+    startNewChatWithPrompt(prompt)
+    setCurrentPage("chat")
+  }
 
   return (
     <div className="min-h-full overflow-y-auto bg-[#020817] text-slate-100">
+      <DetailPopup detail={detailModal} onClose={() => setDetailModal(null)} />
       <div className="mx-auto grid max-w-[1740px] gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <main className="space-y-5">
           <section className="relative overflow-hidden rounded-3xl border border-cyan-300/10 bg-[#071323]/88 p-7 shadow-[0_30px_120px_rgba(15,23,42,.45)]">
@@ -443,7 +542,7 @@ export function MissionControl() {
               </div>
               <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
                 {metricCards.map((card) => (
-                  <button key={card.label} onClick={() => setCurrentPage(card.page)} className="group rounded-2xl border border-cyan-300/12 bg-[#07111f]/80 p-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-[#0a1a2d]">
+                  <button key={card.label} onClick={() => openDetail(card.detailKey, `${card.label} ${card.title}`)} className="group rounded-2xl border border-cyan-300/12 bg-[#07111f]/80 p-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-[#0a1a2d]">
                     <div className="mb-4 flex items-center justify-between text-slate-100">
                       <span className="text-slate-300">{card.icon}</span>
                       <span className="text-xs text-emerald-400">{card.delta}</span>
@@ -487,10 +586,10 @@ export function MissionControl() {
             <div className="space-y-5">
               <Panel title="Knowledge Overview">
                 <div className="grid gap-6 p-5 md:grid-cols-[220px_1fr]">
-                  <AnimatedKnowledgeDonut loading={isIntegrationRefreshing} total={totalKnowledgeItems} segments={knowledgeSegments} onClick={() => setCurrentPage("memory")} />
+                  <AnimatedKnowledgeDonut loading={isIntegrationRefreshing} total={totalKnowledgeItems} segments={knowledgeSegments} onClick={() => openDetail("notes", "Knowledge Items")} />
                   <div className="grid content-center gap-3">
                     {knowledgeSegments.map((segment) => (
-                      <button key={segment.label} onClick={() => setCurrentPage(segment.page)} className="flex items-center justify-between rounded-xl px-2 py-1 text-left transition hover:bg-white/[.04]">
+                      <button key={segment.label} onClick={() => openDetail(segment.detailKey, segment.label)} className="flex items-center justify-between rounded-xl px-2 py-1 text-left transition hover:bg-white/[.04]">
                         <span className="flex items-center gap-3 text-sm text-slate-300">
                           <span className="h-3 w-3 rounded" style={{ backgroundColor: segment.color }} />
                           {segment.label}
@@ -527,7 +626,7 @@ export function MissionControl() {
                 <Panel title="AI Suggestions">
                   <div className="grid gap-3 p-5 sm:grid-cols-2">
                     {suggestions.map((suggestion) => (
-                      <button key={suggestion.title} onClick={() => startNewChatWithPrompt(suggestion.prompt)} className="rounded-2xl border border-white/5 bg-white/[.025] p-4 text-left transition hover:border-purple-300/35 hover:bg-white/[.05]">
+                      <button key={suggestion.title} onClick={() => openSuggestion(suggestion.prompt)} className="rounded-2xl border border-white/5 bg-white/[.025] p-4 text-left transition hover:border-purple-300/35 hover:bg-white/[.05]">
                         <p className="text-sm font-semibold text-slate-100">{suggestion.title}</p>
                         <p className="mt-2 line-clamp-2 text-xs text-slate-400">{suggestion.text}</p>
                         <ChevronRight className="mt-3 h-4 w-4 text-blue-300" />
@@ -539,19 +638,15 @@ export function MissionControl() {
             </div>
           </div>
 
-          <Panel title="Quick Actions">
-            <div className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-6">
-              {[
-                { label: "Search Knowledge", icon: <Search className="h-5 w-5" />, action: () => setCurrentPage("memory") },
-                { label: "Explain Repository", icon: <Github className="h-5 w-5" />, action: () => startNewChatWithPrompt("Explain my most active GitHub repository.") },
-                { label: "Create Notes", icon: <NotebookText className="h-5 w-5" />, action: () => setCurrentPage("memory") },
-                { label: "Generate Study Plan", icon: <CalendarDays className="h-5 w-5" />, action: () => startNewChatWithPrompt("Generate a study plan from my current workspace context.") },
-                { label: "Summarize Commits", icon: <Code2 className="h-5 w-5" />, action: () => startNewChatWithPrompt("Summarize my recent GitHub commits.") },
-                { label: "Ask CEASER", icon: <Sparkles className="h-5 w-5" />, action: () => setIsSearchOpen(true) },
-              ].map((action) => (
-                <button key={action.label} onClick={action.action} className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/10 bg-[#091627] px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-cyan-300/35 hover:bg-[#0c1d32]">
-                  {action.icon}
-                  {action.label}
+          <Panel title="Active Agents">
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {agents.map((agent) => (
+                <button key={agent.id} onClick={() => setCurrentPage("agents")} className="flex items-center gap-3 rounded-2xl border border-cyan-300/10 bg-[#091627] p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-[#0c1d32]">
+                  <AgentAvatar agent={agent} size="md" showStatus showGlow />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-white">{agent.name}</span>
+                    <span className="block truncate text-xs text-slate-500">{agent.status === "active" ? "Active" : "Ready"}</span>
+                  </span>
                 </button>
               ))}
             </div>

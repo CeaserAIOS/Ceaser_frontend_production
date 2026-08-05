@@ -325,50 +325,50 @@
     background: rgba(255, 255, 255, 0.62);
   }
 
-  :root.light [class*="bg-[#050914]"],
-  :root.light [class*="bg-[#050816]"],
-  :root.light [class*="bg-[#070c18]"],
-  :root.light [class*="bg-[#07101f]"],
-  :root.light [class*="bg-[#090f1e]"],
-  :root.light [class*="bg-[#0B1224]"],
-  :root.light [class*="bg-[#111827]"] {
+  :root.light [class*="bg-[#050914]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#050816]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#070c18]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#07101f]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#090f1e]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#0B1224]"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-[#111827]"]:not(.ceaser-dark-island *) {
     background-color: rgba(255, 255, 255, 0.72) !important;
   }
 
-  :root.light [class*="bg-white/["],
-  :root.light [class*="bg-white/5"],
-  :root.light [class*="bg-white/10"] {
+  :root.light [class*="bg-white/["]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-white/5"]:not(.ceaser-dark-island *),
+  :root.light [class*="bg-white/10"]:not(.ceaser-dark-island *) {
     background-color: rgba(255, 255, 255, 0.58) !important;
   }
 
-  :root.light [class*="border-white/"] {
+  :root.light [class*="border-white/"]:not(.ceaser-dark-island *) {
     border-color: rgba(15, 23, 42, 0.12) !important;
   }
 
-  :root.light .text-white,
-  :root.light .text-white\/80,
-  :root.light .text-white\/70,
-  :root.light .text-white\/65,
-  :root.light .text-white\/60,
-  :root.light .text-white\/58,
-  :root.light .text-white\/55,
-  :root.light .text-white\/50,
-  :root.light .text-white\/48,
-  :root.light .text-white\/45,
-  :root.light .text-white\/42,
-  :root.light .text-white\/40,
-  :root.light .text-white\/38,
-  :root.light .text-white\/35 {
+  :root.light .text-white:not(.ceaser-dark-island *),
+  :root.light .text-white\/80:not(.ceaser-dark-island *),
+  :root.light .text-white\/70:not(.ceaser-dark-island *),
+  :root.light .text-white\/65:not(.ceaser-dark-island *),
+  :root.light .text-white\/60:not(.ceaser-dark-island *),
+  :root.light .text-white\/58:not(.ceaser-dark-island *),
+  :root.light .text-white\/55:not(.ceaser-dark-island *),
+  :root.light .text-white\/50:not(.ceaser-dark-island *),
+  :root.light .text-white\/48:not(.ceaser-dark-island *),
+  :root.light .text-white\/45:not(.ceaser-dark-island *),
+  :root.light .text-white\/42:not(.ceaser-dark-island *),
+  :root.light .text-white\/40:not(.ceaser-dark-island *),
+  :root.light .text-white\/38:not(.ceaser-dark-island *),
+  :root.light .text-white\/35:not(.ceaser-dark-island *) {
     color: #071126 !important;
   }
 
-  :root.light .text-slate-200,
-  :root.light .text-slate-300,
-  :root.light .text-slate-400 {
+  :root.light .text-slate-200:not(.ceaser-dark-island *),
+  :root.light .text-slate-300:not(.ceaser-dark-island *),
+  :root.light .text-slate-400:not(.ceaser-dark-island *) {
     color: #334155 !important;
   }
 
-  :root.light .hover\:text-white:hover {
+  :root.light .hover\:text-white:hover:not(.ceaser-dark-island *) {
     color: #071126 !important;
   }
 

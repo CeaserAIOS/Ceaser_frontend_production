@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/commercial"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { voiceApi, type VoiceSettingsRecord } from "@/lib/api/voice"
+import { desktopApi, type DesktopDevice } from "@/lib/api/desktop"
 import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { 
@@ -155,6 +156,9 @@ export function SettingsPage() {
   const [voiceMessage, setVoiceMessage] = useState("")
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([])
   const [sessionActive, setSessionActive] = useState(false)
+  const [desktopDevices, setDesktopDevices] = useState<DesktopDevice[]>([])
+  const [desktopDevicesBusy, setDesktopDevicesBusy] = useState(false)
+  const [desktopDevicesMessage, setDesktopDevicesMessage] = useState("")
   const [preferences, setPreferences] = useState({ notifications: true })
   const [billingOverview, setBillingOverview] = useState<BillingSubscriptionOverview | null>(null)
   const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>([])
@@ -190,6 +194,11 @@ export function SettingsPage() {
       setSessionActive(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (activeSection !== "security" || !getAccessToken()) return
+    void loadDesktopDevices()
+  }, [activeSection])
 
   useEffect(() => {
     let mounted = true
@@ -282,6 +291,32 @@ export function SettingsPage() {
     }
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(next))
     setProfile(next)
+  }
+
+  async function loadDesktopDevices() {
+    setDesktopDevicesBusy(true)
+    setDesktopDevicesMessage("")
+    try {
+      setDesktopDevices(await desktopApi.listDevices())
+    } catch (error) {
+      setDesktopDevicesMessage(error instanceof Error ? error.message : "Could not load connected desktop devices.")
+    } finally {
+      setDesktopDevicesBusy(false)
+    }
+  }
+
+  async function revokeDesktopDevice(deviceId: string) {
+    setDesktopDevicesBusy(true)
+    setDesktopDevicesMessage("")
+    try {
+      await desktopApi.revokeDevice(deviceId)
+      setDesktopDevices((current) => current.map((device) => device.device_id === deviceId ? { ...device, status: "revoked", revoked_at: new Date().toISOString() } : device))
+      setDesktopDevicesMessage("Desktop device disconnected.")
+    } catch (error) {
+      setDesktopDevicesMessage(error instanceof Error ? error.message : "Could not disconnect the desktop device.")
+    } finally {
+      setDesktopDevicesBusy(false)
+    }
   }
 
   function hydrateCommercialCache() {
@@ -1443,6 +1478,40 @@ export function SettingsPage() {
                     </span>
                   </div>
                 </div>
+                <div className="rounded-xl border border-border bg-background/50 p-4">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Connected desktop devices</p>
+                      <p className="text-xs text-muted-foreground">Revoke a desktop companion if a device is lost, shared, or no longer trusted.</p>
+                    </div>
+                    <button onClick={() => void loadDesktopDevices()} disabled={desktopDevicesBusy} className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50">
+                      {desktopDevicesBusy ? "Loading..." : "Refresh"}
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {desktopDevices.length ? desktopDevices.map((device) => (
+                      <div key={device.device_id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/60 p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{device.device_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {device.platform || "desktop"} {device.app_version ? `- v${device.app_version}` : ""} · Last active {formatDeviceDate(device.last_seen_at)}
+                          </p>
+                          <p className={cn("mt-1 text-xs font-medium", device.revoked_at ? "text-red-400" : "text-emerald-400")}>{device.revoked_at ? "Revoked" : "Connected"}</p>
+                        </div>
+                        {!device.revoked_at && (
+                          <button onClick={() => void revokeDesktopDevice(device.device_id)} disabled={desktopDevicesBusy} className="shrink-0 rounded-lg border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50">
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    )) : (
+                      <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                        {desktopDevicesBusy ? "Loading desktop devices..." : "No connected desktop companion devices yet."}
+                      </p>
+                    )}
+                  </div>
+                  {desktopDevicesMessage && <p className="mt-3 text-xs text-muted-foreground">{desktopDevicesMessage}</p>}
+                </div>
               </div>
             </GlowCard>
           </div>
@@ -1746,6 +1815,13 @@ function getMfaQr(enrollment: Record<string, unknown>) {
 function getMfaSecret(enrollment: Record<string, unknown>) {
   const totp = enrollment.totp as Record<string, unknown> | undefined
   return String(totp?.secret || "")
+}
+
+function formatDeviceDate(value?: string | null) {
+  if (!value) return "not seen yet"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "recently"
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
 

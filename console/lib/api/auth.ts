@@ -22,10 +22,10 @@ export const authApi = {
   },
   completeDesktopLink: (session?: { access_token?: string | null; refresh_token?: string | null } | null) => {
     if (typeof window === "undefined" || !session?.access_token) return false
-    const params = new URLSearchParams()
-    params.set("access_token", session.access_token)
-    if (session.refresh_token) params.set("refresh_token", session.refresh_token)
-    window.location.replace(`ceaser-app://bundle/auth/callback/#${params.toString()}`)
+    const params = new URLSearchParams(window.location.search)
+    params.delete("desktop_link")
+    const target = `/console/auth/desktop/${params.toString() ? `?${params.toString()}` : ""}`
+    window.location.replace(target)
     return true
   },
   consumeOAuthRedirect: () => {

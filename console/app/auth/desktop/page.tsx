@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { MonitorCheck, ShieldCheck } from "lucide-react"
 import { desktopApi } from "@/lib/api/desktop"
 import { getAccessToken } from "@/lib/api/client"
+import { authApi } from "@/lib/api/auth"
 
 function param(name: string) {
   if (typeof window === "undefined") return ""
@@ -26,6 +27,10 @@ export default function DesktopAuthPage() {
 
   const signedIn = Boolean(getAccessToken())
   const validRequest = Boolean(request.state && request.code_challenge && request.device_id)
+
+  useEffect(() => {
+    authApi.rememberDesktopAuthReturn()
+  }, [])
 
   async function approve() {
     if (!validRequest) {
@@ -72,8 +77,8 @@ export default function DesktopAuthPage() {
         {!signedIn ? (
           <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
             <p className="font-semibold text-amber-100">Sign in required</p>
-            <p className="mt-1 text-sm text-amber-100/80">Open the CEASER console, sign in, then return to this desktop connection screen.</p>
-            <a href="/console/" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950">Go to console</a>
+            <p className="mt-1 text-sm text-amber-100/80">Sign in once. CEASER will return here with the same secure desktop request.</p>
+            <a href="/console/?desktop_link=1" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950">Sign in to continue</a>
           </div>
         ) : (
           <button

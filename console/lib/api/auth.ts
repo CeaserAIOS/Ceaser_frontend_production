@@ -1,6 +1,8 @@
 import { apiRequest } from "./client"
 import { clearAuthTokens, setAuthTokens } from "./client"
 
+const DESKTOP_AUTH_RETURN_KEY = "ceaser_desktop_auth_return"
+
 export interface AuthSession {
   id?: string
   userId?: string
@@ -22,11 +24,24 @@ export const authApi = {
   },
   completeDesktopLink: (session?: { access_token?: string | null; refresh_token?: string | null } | null) => {
     if (typeof window === "undefined" || !session?.access_token) return false
+    const storedReturn = window.sessionStorage.getItem(DESKTOP_AUTH_RETURN_KEY)
+    if (storedReturn?.startsWith("/console/auth/desktop")) {
+      window.sessionStorage.removeItem(DESKTOP_AUTH_RETURN_KEY)
+      window.location.replace(storedReturn)
+      return true
+    }
     const params = new URLSearchParams(window.location.search)
     params.delete("desktop_link")
     const target = `/console/auth/desktop/${params.toString() ? `?${params.toString()}` : ""}`
     window.location.replace(target)
     return true
+  },
+  rememberDesktopAuthReturn: (url?: string) => {
+    if (typeof window === "undefined") return
+    const target = url || `${window.location.pathname}${window.location.search}`
+    if (target.startsWith("/console/auth/desktop")) {
+      window.sessionStorage.setItem(DESKTOP_AUTH_RETURN_KEY, target)
+    }
   },
   consumeOAuthRedirect: () => {
     if (typeof window === "undefined") return null

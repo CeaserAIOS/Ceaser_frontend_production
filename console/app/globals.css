@@ -382,44 +382,66 @@
   }
 
   :root.light .ceaser-mission-shell {
-    background: #050816 !important;
-    color: #f8fafc !important;
-    color-scheme: dark;
+    background: #edf2fa !important;
+    color: #0f172a !important;
+    color-scheme: light;
   }
 
   :root.light .ceaser-mission-shell .spatial-shell {
-    background:
-      radial-gradient(circle at 38% 0%, rgba(79, 140, 255, 0.14), transparent 34%),
-      radial-gradient(circle at 74% 42%, rgba(34, 211, 238, 0.10), transparent 28%),
-      #050816 !important;
+    background: linear-gradient(135deg, #f8fbff 0%, #eef3fb 100%) !important;
   }
 
   :root.light .ceaser-mission-shell .spatial-panel,
   :root.light .ceaser-mission-shell .ceaser-app-frame,
   :root.light .ceaser-mission-shell header {
-    border-color: rgba(103, 232, 249, 0.12) !important;
-    background: rgba(7, 19, 35, 0.88) !important;
-    color: #f8fafc !important;
+    border-color: rgba(203, 213, 225, 0.86) !important;
+    background: rgba(255, 255, 255, 0.82) !important;
+    color: #0f172a !important;
   }
 
-  :root.light .ceaser-mission-shell .text-foreground,
-  :root.light .ceaser-mission-shell .text-muted-foreground,
-  :root.light .ceaser-mission-shell .text-card-foreground {
-    color: #cbd5e1 !important;
+  :root.light .ceaser-mission-shell .ceaser-mission-page {
+    background: linear-gradient(135deg, #f8fbff 0%, #eef3fb 100%) !important;
+    color: #0f172a !important;
   }
 
-  :root.light .ceaser-mission-shell .bg-card,
-  :root.light .ceaser-mission-shell .bg-card\/55,
-  :root.light .ceaser-mission-shell .bg-card\/78,
-  :root.light .ceaser-mission-shell .bg-background,
-  :root.light .ceaser-mission-shell .bg-white\/5,
-  :root.light .ceaser-mission-shell .bg-white\/10 {
-    background-color: rgba(8, 17, 32, 0.72) !important;
+  :root.light .ceaser-mission-shell .ceaser-mission-page section,
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-[#071323]"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-[#07111f]"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-[#091627]"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-[#0c1d32]"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-white/["],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-white/5"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-white/10"] {
+    background-color: rgba(255, 255, 255, 0.82) !important;
   }
 
-  :root.light .ceaser-mission-shell .border-border,
-  :root.light .ceaser-mission-shell [class*="border-white/"] {
-    border-color: rgba(148, 163, 184, 0.18) !important;
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="border-white/"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="border-cyan-300/"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page .border-border {
+    border-color: rgba(203, 213, 225, 0.9) !important;
+  }
+
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-white,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-100,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-200,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-300 {
+    color: #0f172a !important;
+  }
+
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-400,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-500,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-slate-600,
+  :root.light .ceaser-mission-shell .ceaser-mission-page .text-muted-foreground {
+    color: #64748b !important;
+  }
+
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="shadow-[0_"],
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="shadow-[inset"] {
+    box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  }
+
+  :root.light .ceaser-mission-shell .ceaser-mission-page [class*="bg-[radial-gradient"] {
+    opacity: 0.32;
   }
 
   .spatial-active-glow {

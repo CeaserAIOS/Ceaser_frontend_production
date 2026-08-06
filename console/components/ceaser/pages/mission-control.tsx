@@ -519,7 +519,7 @@ export function MissionControl() {
   }
 
   return (
-    <div className="ceaser-mission-page min-h-full overflow-y-auto bg-[#f3f6fb] text-slate-950 [color-scheme:light]">
+    <div className="ceaser-dark-island min-h-full overflow-y-auto bg-[#020817] text-slate-100 [color-scheme:dark]">
       <DetailPopup detail={detailModal} onClose={() => setDetailModal(null)} />
       <div className="mx-auto grid max-w-[1740px] gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <main className="space-y-5">

@@ -53,36 +53,6 @@
   --sidebar-ring: #4f8cff;
 }
 
-:root.light {
-  --background: #eef4ff;
-  --foreground: #071126;
-  --card: #ffffff;
-  --card-foreground: #071126;
-  --popover: #ffffff;
-  --popover-foreground: #071126;
-  --primary: #3f6df6;
-  --primary-foreground: #ffffff;
-  --secondary: #e8eefb;
-  --secondary-foreground: #334155;
-  --muted: #dfe8f7;
-  --muted-foreground: #64748b;
-  --accent: #6d5df6;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --border: rgba(15, 23, 42, 0.12);
-  --input: #ffffff;
-  --ring: #3f6df6;
-  --sidebar: rgba(255, 255, 255, 0.84);
-  --sidebar-foreground: #071126;
-  --sidebar-primary: #3f6df6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(63, 109, 246, 0.10);
-  --sidebar-accent-foreground: #071126;
-  --sidebar-border: rgba(15, 23, 42, 0.12);
-  --sidebar-ring: #3f6df6;
-}
-
 @theme inline {
   --font-sans: 'Inter', 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
@@ -152,18 +122,6 @@
     color: #ffffff;
   }
 
-  :root.light ::selection {
-    background: rgba(63, 109, 246, 0.20);
-    color: #071126;
-  }
-
-  :root.light body {
-    background:
-      radial-gradient(circle at 14% 8%, rgba(63, 109, 246, 0.15), transparent 32rem),
-      radial-gradient(circle at 88% 6%, rgba(124, 92, 255, 0.10), transparent 30rem),
-      linear-gradient(135deg, #f8fbff 0%, #eef4ff 46%, #e7effc 100%);
-  }
-
   select {
     color-scheme: dark;
     background:
@@ -184,19 +142,6 @@
 
   select option:disabled {
     color: #7b8498;
-  }
-
-  :root.light select {
-    color-scheme: light;
-    background:
-      linear-gradient(45deg, transparent 50%, rgba(71, 85, 105, 0.9) 50%) calc(100% - 18px) 50% / 7px 7px no-repeat,
-      linear-gradient(135deg, rgba(71, 85, 105, 0.9) 50%, transparent 50%) calc(100% - 13px) 50% / 7px 7px no-repeat,
-      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(238, 244, 255, 0.98));
-  }
-
-  :root.light select option {
-    background: #ffffff;
-    color: #071126;
   }
 }
 
@@ -225,12 +170,6 @@
     border: 1px solid rgba(148, 163, 184, 0.16);
     box-shadow: 0 22px 60px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(248, 250, 252, 0.045);
   }
-
-  :root.light .glass-card {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(241, 246, 255, 0.84));
-    border: 1px solid rgba(15, 23, 42, 0.10);
-    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  }
   
   .glass-card-hover:hover {
     transform: translateY(-2px);
@@ -238,12 +177,6 @@
       linear-gradient(145deg, rgba(23, 32, 51, 0.96), rgba(11, 18, 36, 0.86));
     border-color: rgba(79, 140, 255, 0.36);
     box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34), 0 0 28px rgba(79, 140, 255, 0.12);
-  }
-
-  :root.light .glass-card-hover:hover {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(232, 239, 252, 0.90));
-    border-color: rgba(63, 109, 246, 0.28);
-    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.14), 0 0 28px rgba(63, 109, 246, 0.10);
   }
   
   .neural-grid {
@@ -259,22 +192,10 @@
       radial-gradient(circle at 90% 10%, rgba(124, 92, 255, 0.08), transparent 24rem);
   }
 
-  :root.light .spatial-shell {
-    background:
-      radial-gradient(circle at 20% 0%, rgba(63, 109, 246, 0.10), transparent 26rem),
-      radial-gradient(circle at 90% 10%, rgba(124, 92, 255, 0.08), transparent 24rem);
-  }
-
   .spatial-panel {
     border: 1px solid rgba(148, 163, 184, 0.16);
     background: linear-gradient(145deg, rgba(17, 24, 39, 0.92), rgba(11, 18, 36, 0.78));
     box-shadow: 0 24px 72px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(248, 250, 252, 0.045);
-  }
-
-  :root.light .spatial-panel {
-    border: 1px solid rgba(15, 23, 42, 0.10);
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.90), rgba(241, 246, 255, 0.76));
-    box-shadow: 0 24px 72px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.78);
   }
 
   .spatial-panel-elevated {
@@ -307,119 +228,9 @@
     }
   }
 
-  :root.light .spatial-panel-elevated {
-    border: 1px solid rgba(63, 109, 246, 0.18);
-    background:
-      radial-gradient(circle at 20% 0%, rgba(63, 109, 246, 0.10), transparent 18rem),
-      linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(239, 245, 255, 0.84));
-    box-shadow: 0 30px 90px rgba(15, 23, 42, 0.14), 0 0 42px rgba(63, 109, 246, 0.08);
-  }
-
   .spatial-muted-panel {
     border: 1px solid rgba(148, 163, 184, 0.12);
     background: rgba(11, 18, 36, 0.58);
-  }
-
-  :root.light .spatial-muted-panel {
-    border: 1px solid rgba(15, 23, 42, 0.10);
-    background: rgba(255, 255, 255, 0.62);
-  }
-
-  :root.light [class*="bg-[#050914]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#050816]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#070c18]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#07101f]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#090f1e]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#0B1224]"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-[#111827]"]:not(.ceaser-dark-island *) {
-    background-color: rgba(255, 255, 255, 0.72) !important;
-  }
-
-  :root.light [class*="bg-white/["]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-white/5"]:not(.ceaser-dark-island *),
-  :root.light [class*="bg-white/10"]:not(.ceaser-dark-island *) {
-    background-color: rgba(255, 255, 255, 0.58) !important;
-  }
-
-  :root.light [class*="border-white/"]:not(.ceaser-dark-island *) {
-    border-color: rgba(15, 23, 42, 0.12) !important;
-  }
-
-  :root.light .text-white:not(.ceaser-dark-island *),
-  :root.light .text-white\/80:not(.ceaser-dark-island *),
-  :root.light .text-white\/70:not(.ceaser-dark-island *),
-  :root.light .text-white\/65:not(.ceaser-dark-island *),
-  :root.light .text-white\/60:not(.ceaser-dark-island *),
-  :root.light .text-white\/58:not(.ceaser-dark-island *),
-  :root.light .text-white\/55:not(.ceaser-dark-island *),
-  :root.light .text-white\/50:not(.ceaser-dark-island *),
-  :root.light .text-white\/48:not(.ceaser-dark-island *),
-  :root.light .text-white\/45:not(.ceaser-dark-island *),
-  :root.light .text-white\/42:not(.ceaser-dark-island *),
-  :root.light .text-white\/40:not(.ceaser-dark-island *),
-  :root.light .text-white\/38:not(.ceaser-dark-island *),
-  :root.light .text-white\/35:not(.ceaser-dark-island *) {
-    color: #071126 !important;
-  }
-
-  :root.light .text-slate-200:not(.ceaser-dark-island *),
-  :root.light .text-slate-300:not(.ceaser-dark-island *),
-  :root.light .text-slate-400:not(.ceaser-dark-island *) {
-    color: #334155 !important;
-  }
-
-  :root.light .hover\:text-white:hover:not(.ceaser-dark-island *) {
-    color: #071126 !important;
-  }
-
-  :root.light [class*="bg-gradient-to-r"].text-white,
-  :root.light [class*="bg-violet"].text-white,
-  :root.light [class*="bg-primary"].text-white,
-  :root.light [class*="bg-emerald"].text-white,
-  :root.light [class*="bg-destructive"].text-white,
-  :root.light [class*="bg-cyan"].text-white {
-    color: #ffffff !important;
-  }
-
-  :root.light .ceaser-mission-shell {
-    background: #050816 !important;
-    color: #f8fafc !important;
-    color-scheme: dark;
-  }
-
-  :root.light .ceaser-mission-shell .spatial-shell {
-    background:
-      radial-gradient(circle at 38% 0%, rgba(79, 140, 255, 0.14), transparent 34%),
-      radial-gradient(circle at 74% 42%, rgba(34, 211, 238, 0.10), transparent 28%),
-      #050816 !important;
-  }
-
-  :root.light .ceaser-mission-shell .spatial-panel,
-  :root.light .ceaser-mission-shell .ceaser-app-frame,
-  :root.light .ceaser-mission-shell header {
-    border-color: rgba(103, 232, 249, 0.12) !important;
-    background: rgba(7, 19, 35, 0.88) !important;
-    color: #f8fafc !important;
-  }
-
-  :root.light .ceaser-mission-shell .text-foreground,
-  :root.light .ceaser-mission-shell .text-muted-foreground,
-  :root.light .ceaser-mission-shell .text-card-foreground {
-    color: #cbd5e1 !important;
-  }
-
-  :root.light .ceaser-mission-shell .bg-card,
-  :root.light .ceaser-mission-shell .bg-card\/55,
-  :root.light .ceaser-mission-shell .bg-card\/78,
-  :root.light .ceaser-mission-shell .bg-background,
-  :root.light .ceaser-mission-shell .bg-white\/5,
-  :root.light .ceaser-mission-shell .bg-white\/10 {
-    background-color: rgba(8, 17, 32, 0.72) !important;
-  }
-
-  :root.light .ceaser-mission-shell .border-border,
-  :root.light .ceaser-mission-shell [class*="border-white/"] {
-    border-color: rgba(148, 163, 184, 0.18) !important;
   }
 
   .spatial-active-glow {

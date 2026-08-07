@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import favicon from '@/public/favicon.png'
-import faviconLight from '@/public/favicon-light.png'
 import appIcon from '@/public/app-icon.png'
 import './globals.css'
 
@@ -9,16 +8,7 @@ export const metadata: Metadata = {
   description: 'Your AI Workforce is ready. Manage your personal AI agents with CEASER OS.',
   generator: 'CEASER',
   icons: {
-    icon: [
-      {
-        url: faviconLight.src,
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: favicon.src,
-        media: '(prefers-color-scheme: dark)',
-      },
-    ],
+    icon: favicon.src,
     apple: appIcon.src,
   },
 }

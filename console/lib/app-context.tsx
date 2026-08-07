@@ -5,7 +5,7 @@ import type { AppPage } from "@/lib/ceaser"
 import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
 
 type DialogTone = "default" | "danger"
-type AppTheme = "dark" | "light"
+type AppTheme = "dark"
 type PendingChatRequest = { id: string; prompt: string }
 type DialogRequest =
   | {
@@ -87,8 +87,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("ceaser_theme")
-    if (stored === "light" || stored === "dark") setThemeState(stored)
+    // CEASER is dark-mode only. The light class is always removed and dark is always applied.
+    document.documentElement.classList.remove("light")
+    document.documentElement.classList.add("dark")
+    document.documentElement.dataset.theme = "dark"
+    window.localStorage.setItem("ceaser_theme", "dark")
     const params = new URLSearchParams(window.location.search)
     const view = params.get("view") || window.localStorage.getItem("ceaser_current_page")
     if (view) setCurrentPage(view === "student" && !ENABLE_STUDENT_HUB ? "mission-control" : (view as AppPage))
@@ -104,14 +107,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.history.replaceState({}, "", url)
   }
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("light", theme === "light")
-    document.documentElement.classList.toggle("dark", theme === "dark")
-    document.documentElement.dataset.theme = theme
-    window.localStorage.setItem("ceaser_theme", theme)
-  }, [theme])
-
-  const setTheme = (nextTheme: AppTheme) => setThemeState(nextTheme)
+  const setTheme = (_nextTheme: AppTheme) => setThemeState("dark")
   const startNewChatWithPrompt = (prompt: string) => {
     const trimmedPrompt = prompt.trim()
     if (!trimmedPrompt) return

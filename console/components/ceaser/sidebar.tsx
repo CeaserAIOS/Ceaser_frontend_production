@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react"
 import { ShieldCheck } from "lucide-react"
 import favicon from "@/public/favicon.png"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
-import lightWordmark from "@/public/ceaser-wordmark-light-transparent.png"
 import { useApp } from "@/lib/app-context"
 import { useAgentStore } from "@/lib/stores/agent-store"
 import { ceaserAgents, navigationItems } from "@/lib/ceaser"
@@ -14,7 +13,7 @@ import { AgentAvatar } from "./agent-avatar"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
-  const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed, theme } = useApp()
+  const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed } = useApp()
   const { isAgentEnabled } = useAgentStore()
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -73,11 +72,11 @@ export function Sidebar() {
           />
         ) : (
           <Image
-            src={theme === "light" ? lightWordmark : darkWordmark}
+            src={darkWordmark}
             alt="CEASER"
             width={178}
             height={46}
-            className={cn("h-10 w-full max-w-[178px] object-contain", theme === "light" && "mix-blend-multiply")}
+            className="h-10 w-full max-w-[178px] object-contain"
             priority
           />
         )}

@@ -21,7 +21,6 @@ import {
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { voiceApi, type VoiceSettingsRecord } from "@/lib/api/voice"
 import { desktopApi, type DesktopDevice } from "@/lib/api/desktop"
-import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { 
   User, 
@@ -29,7 +28,6 @@ import {
   Sliders,
   Info,
   Moon,
-  Sun,
   Bell,
   Key,
   Smartphone,
@@ -136,7 +134,6 @@ function ensureRazorpayLoaded() {
 }
 
 export function SettingsPage() {
-  const { theme, setTheme } = useApp()
   const [activeSection, setActiveSection] = useState("status")
   const [profile, setProfile] = useState<{ name?: string; email?: string; useCase?: string } | null>(null)
   const [profileDraft, setProfileDraft] = useState({ name: getUserDisplayName(readUserProfile(), user.name), email: "", useCase: user.role })
@@ -1549,25 +1546,11 @@ export function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {theme === "light" ? <Sun className="h-5 w-5 text-muted-foreground" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
+                    <Moon className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium">Appearance</p>
-                      <p className="text-sm text-muted-foreground">Switch between CEASER dark and light modes</p>
+                      <p className="text-sm text-muted-foreground">CEASER runs in dark mode</p>
                     </div>
-                  </div>
-                  <div className="flex rounded-xl border border-border bg-secondary/60 p-1">
-                    <button
-                      onClick={() => setTheme("dark")}
-                      className={cn("rounded-lg px-3 py-1.5 text-sm transition", theme === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      Dark
-                    </button>
-                    <button
-                      onClick={() => setTheme("light")}
-                      className={cn("rounded-lg px-3 py-1.5 text-sm transition", theme === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      Light
-                    </button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">

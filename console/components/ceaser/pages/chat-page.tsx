@@ -201,7 +201,7 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
 }
 
 export function ChatPage() {
-  const { setCurrentPage, confirmDialog, promptDialog, theme, pendingChatRequest, clearPendingChatRequest } = useApp()
+  const { setCurrentPage, confirmDialog, promptDialog, pendingChatRequest, clearPendingChatRequest } = useApp()
   const [displayName, setDisplayName] = useState("there")
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -825,9 +825,9 @@ export function ChatPage() {
   }
 
   return (
-    <div className={cn("relative flex h-full overflow-hidden text-foreground", theme === "light" ? "bg-[#eef4ff]" : "bg-[#050816]")}>
-      <div className={cn("pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.18)_1px,transparent_1px)] [background-size:36px_36px]", theme === "light" ? "opacity-[0.12]" : "opacity-[0.08]")} />
-      <div className={cn("pointer-events-none absolute inset-0", theme === "light" ? "bg-[radial-gradient(circle_at_18%_0%,rgba(63,109,246,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(124,92,255,0.08),transparent_32%)]" : "bg-[radial-gradient(circle_at_18%_0%,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(0,212,255,0.08),transparent_32%)]")} />
+    <div className={cn("relative flex h-full overflow-hidden text-foreground", "bg-[#050816]")}>
+      <div className={cn("pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.18)_1px,transparent_1px)] [background-size:36px_36px]", "opacity-[0.08]")} />
+      <div className={cn("pointer-events-none absolute inset-0", "bg-[radial-gradient(circle_at_18%_0%,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(0,212,255,0.08),transparent_32%)]")} />
 
       <aside
         className={cn(

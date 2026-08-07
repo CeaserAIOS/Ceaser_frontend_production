@@ -12,7 +12,7 @@ function param(name: string) {
 }
 
 export default function DesktopAuthPage() {
-  const [status, setStatus] = useState<"idle" | "working" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "working" | "connected" | "timeout" | "error">("idle")
   const [message, setMessage] = useState("")
   const request = useMemo(() => ({
     state: param("state"),
@@ -43,7 +43,18 @@ export default function DesktopAuthPage() {
     try {
       const response = await desktopApi.authorize(request)
       const params = new URLSearchParams({ code: response.code, state: response.state })
-      window.location.replace(`ceaser://auth/callback?${params.toString()}`)
+      const callbackUrl = `ceaser://auth/callback?${params.toString()}`
+      console.info("[CEASER desktop auth] authorization_code_created", { state: response.state, callback_has_code: true })
+      setMessage("Opening CEASER Desktop with a secure one-time code...")
+      window.setTimeout(() => {
+        setStatus((current) => current === "working" ? "connected" : current)
+        setMessage("Desktop connection request sent. If CEASER Desktop is open, you may close this page.")
+      }, 1400)
+      window.setTimeout(() => {
+        setStatus((current) => current === "working" ? "timeout" : current)
+        setMessage("CEASER Desktop did not confirm from the browser. Open the desktop app and try Connect again if it did not update.")
+      }, 18000)
+      window.location.href = callbackUrl
     } catch (error) {
       setStatus("error")
       setMessage(error instanceof Error ? error.message : "Could not authorize CEASER Desktop.")
@@ -83,14 +94,18 @@ export default function DesktopAuthPage() {
         ) : (
           <button
             onClick={() => void approve()}
-            disabled={status === "working" || !validRequest}
+            disabled={status === "working" || status === "connected" || !validRequest}
             className="mt-6 w-full rounded-2xl bg-cyan-300 px-5 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {status === "working" ? "Connecting..." : "Approve and return to desktop"}
+            {status === "working" ? "Connecting..." : status === "connected" ? "Desktop connection sent" : "Approve and return to desktop"}
           </button>
         )}
 
-        {message && <p className={`mt-4 text-sm ${status === "error" ? "text-red-300" : "text-slate-300"}`}>{message}</p>}
+        {message && (
+          <p className={`mt-4 text-sm ${status === "error" ? "text-red-300" : status === "timeout" ? "text-amber-200" : status === "connected" ? "text-emerald-200" : "text-slate-300"}`}>
+            {message}
+          </p>
+        )}
       </section>
     </main>
   )

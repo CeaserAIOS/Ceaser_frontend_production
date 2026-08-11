@@ -96,6 +96,7 @@ export interface ResearchSource {
   excerpt?: string | null
   publisher?: string | null
   retrieved_at?: string | null
+  image_url?: string | null
   score: number
 }
 

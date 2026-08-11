@@ -1291,6 +1291,9 @@ function ChatBubble({
                 : message.role === "assistant" && !message.isStreaming && parseFridayStructuredResponse(message.content)
                 ? <StructuredResponseCard response={parseFridayStructuredResponse(message.content)!} />
                 : <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
+            {message.role === "assistant" && !message.isStreaming && message.research?.sources?.some((source) => source.image_url) && (
+              <ResearchImageStrip sources={message.research.sources} />
+            )}
             {message.role === "user" && (
               <button
                 onClick={() => onEdit(message)}
@@ -1313,6 +1316,36 @@ function ChatBubble({
           A
         </div>
       )}
+    </div>
+  )
+}
+
+function ResearchImageStrip({ sources }: { sources: ResearchResult["sources"] }) {
+  const images = sources.filter((source) => Boolean(source.image_url)).slice(0, 3)
+  if (!images.length) return null
+
+  return (
+    <div className="mt-4 flex gap-3 overflow-x-auto pb-1" aria-label="Images from live research">
+      {images.map((source) => (
+        <a
+          key={`${source.url}-${source.image_url}`}
+          href={source.url}
+          target="_blank"
+          rel="noreferrer"
+          className="group relative block h-36 w-48 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5 focus:outline-none focus:ring-2 focus:ring-cyan-300/70"
+          title={`Open ${source.title}`}
+        >
+          <img
+            src={source.image_url ?? ""}
+            alt={source.title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(event) => { event.currentTarget.closest("a")?.remove() }}
+          />
+          <span className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-1.5 text-xs text-white line-clamp-1">{source.source}</span>
+        </a>
+      ))}
     </div>
   )
 }

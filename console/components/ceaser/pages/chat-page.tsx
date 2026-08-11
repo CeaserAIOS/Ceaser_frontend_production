@@ -1672,10 +1672,11 @@ function MarkdownMessage({ content, isUser, isStreaming }: { content: string; is
     )
   }
 
-  const structured = parseAnswerSections(content)
+  const visibleContent = content.replace(/\s*\(\s*\[?[-\w.]+\.(?:com|org|net|gov|edu|in)\]?\s*\)/gi, "")
+  const structured = parseAnswerSections(visibleContent)
   if (structured) return <StructuredAnswer data={structured} />
 
-  const lines = content.split("\n")
+  const lines = visibleContent.split("\n")
   const elements: ReactNode[] = []
   let bullets: string[] = []
 

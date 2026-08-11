@@ -100,12 +100,20 @@ export interface ResearchSource {
   score: number
 }
 
+export interface ResearchImage {
+  title: string
+  url: string
+  image_url: string
+  source: string
+}
+
 export interface ResearchResult {
   query: string
   summary: string
   key_findings: string[]
   sources: ResearchSource[]
   citations: { title: string; url: string }[]
+  images?: ResearchImage[]
 }
 
 export const chatApi = {

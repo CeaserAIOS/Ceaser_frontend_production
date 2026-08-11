@@ -111,6 +111,7 @@ const normalizeChatResponse = (response: CeaserChatResponse): CeaserChatResponse
         key_findings: safeArray(response.research.key_findings),
         sources: safeArray(response.research.sources),
         citations: safeArray(response.research.citations),
+        images: safeArray(response.research.images),
       }
     : null,
   workflow: response.workflow
@@ -1291,9 +1292,11 @@ function ChatBubble({
                 : message.role === "assistant" && !message.isStreaming && parseFridayStructuredResponse(message.content)
                 ? <StructuredResponseCard response={parseFridayStructuredResponse(message.content)!} />
                 : <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
-            {message.role === "assistant" && !message.isStreaming && message.research?.sources?.some((source) => source.image_url) && (
-              <ResearchImageStrip sources={message.research.sources} />
-            )}
+            {message.role === "assistant" && !message.isStreaming && message.research?.images?.length ? (
+              <ResearchImageStrip images={message.research.images} />
+            ) : message.role === "assistant" && !message.isStreaming && message.research?.sources?.some((source) => source.image_url) ? (
+              <ResearchImageStrip images={message.research.sources.filter((source) => source.image_url).map((source) => ({ title: source.title, url: source.url, image_url: source.image_url as string, source: source.source }))} />
+            ) : null}
             {message.role === "user" && (
               <button
                 onClick={() => onEdit(message)}
@@ -1320,13 +1323,13 @@ function ChatBubble({
   )
 }
 
-function ResearchImageStrip({ sources }: { sources: ResearchResult["sources"] }) {
-  const images = sources.filter((source) => Boolean(source.image_url)).slice(0, 3)
-  if (!images.length) return null
+function ResearchImageStrip({ images }: { images: NonNullable<ResearchResult["images"]> }) {
+  const previews = images.slice(0, 3)
+  if (!previews.length) return null
 
   return (
     <div className="mt-4 flex gap-3 overflow-x-auto pb-1" aria-label="Images from live research">
-      {images.map((source) => (
+      {previews.map((source) => (
         <a
           key={`${source.url}-${source.image_url}`}
           href={source.url}

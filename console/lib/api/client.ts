@@ -12,7 +12,7 @@ export function getApiBaseUrl() {
   if (process.env.NODE_ENV !== "production") {
     return "http://127.0.0.1:8000"
   }
-  throw new Error("NEXT_PUBLIC_API_URL is required in production")
+  return "https://ceaser-backend-production.onrender.com"
 }
 
 const API_BASE_URL = getApiBaseUrl()

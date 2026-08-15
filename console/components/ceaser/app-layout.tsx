@@ -36,11 +36,11 @@ function AppLayoutShell({ children }: AppLayoutProps) {
   const missionActive = currentPage === "mission-control" || currentPage === "student"
 
   return (
-    <div className={cn("flex h-screen flex-col overflow-hidden bg-background", missionActive && "ceaser-mission-shell")}>
+    <div className={cn("ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background", missionActive && "ceaser-mission-shell")}>
       {typeof window !== 'undefined' && !!(window as any).ceaserDesktop?.windowClose && <WindowTitlebar />}
-      <div className="spatial-shell flex min-h-0 flex-1 overflow-hidden p-3">
+      <div className="spatial-shell flex min-h-0 flex-1 overflow-hidden p-2">
         <Sidebar />
-        <div className="ceaser-app-frame ml-3 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.65rem] border border-border bg-card/55 shadow-[0_30px_100px_rgba(0,0,0,0.18)]">
+        <div className="ceaser-app-frame ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card/55 shadow-[0_30px_100px_rgba(0,0,0,0.18)]">
           <Header />
           <main className="min-h-0 flex-1 overflow-y-auto">
             {children}

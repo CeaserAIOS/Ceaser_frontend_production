@@ -159,15 +159,16 @@ export function MemoryPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="ceaser-memory flex h-full flex-col p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Memory</h1>
-          <p className="text-sm text-muted-foreground">Encrypted memories from conversations, projects, files, and research.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Knowledge cortex</p>
+          <h1 className="mt-2 text-3xl font-semibold">Your working memory</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Search and manage the context CEASER can use across conversations and work.</p>
         </div>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="ceaser-primary-action flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white"
         >
           <Plus className="h-4 w-4" />
           Add Memory

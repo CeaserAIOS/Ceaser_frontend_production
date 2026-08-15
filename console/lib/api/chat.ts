@@ -41,6 +41,21 @@ export interface CeaserChatResponse {
   context_summary: Record<string, unknown>
   suggestions?: SuggestionItem[]
   response: string
+  rich_response?: RichResponse | null
+}
+
+export interface RichResponse {
+  id: string
+  conversation_id?: string | null
+  message_id?: string | null
+  status: "streaming" | "working" | "waiting_for_user" | "waiting_for_confirmation" | "completed" | "partial" | "failed" | "cancelled"
+  primary_text: string
+  blocks: Array<Record<string, unknown>>
+  sources: Array<Record<string, unknown>>
+  assets: Array<Record<string, unknown>>
+  actions: Array<Record<string, unknown>>
+  activity: Array<Record<string, unknown>>
+  metadata: Record<string, unknown>
 }
 
 export interface MessageMetadata {
@@ -53,6 +68,7 @@ export interface MessageMetadata {
   workflow?: WorkflowResult | null
   context_summary?: Record<string, unknown>
   suggestions?: SuggestionItem[]
+  rich_response?: RichResponse | null
 }
 
 export interface SuggestionItem {

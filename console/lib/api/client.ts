@@ -9,10 +9,10 @@ export function getApiBaseUrl() {
   // of silently switching to a stale local backend.
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_CEASER_API_URL
   if (configuredUrl) return configuredUrl.replace(/\/$/, "")
-  if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+  if (process.env.NODE_ENV !== "production") {
     return "http://127.0.0.1:8000"
   }
-  return "https://ceaser-backend-production.onrender.com"
+  throw new Error("NEXT_PUBLIC_API_URL is required in production")
 }
 
 const API_BASE_URL = getApiBaseUrl()
@@ -225,6 +225,10 @@ export async function apiStreamRequest(
     onStatus?: (payload: Record<string, unknown>) => void
     onToken?: (text: string) => void
     onComplete?: (payload: Record<string, unknown>) => void
+    onActivity?: (payload: Record<string, unknown>) => void
+    onBlock?: (payload: Record<string, unknown>) => void
+    onResponseStarted?: (payload: Record<string, unknown>) => void
+    onResponseCompleted?: (payload: Record<string, unknown>) => void
     onError?: (message: string) => void
   } = {},
 ) {
@@ -273,6 +277,10 @@ export async function apiStreamRequest(
     if (eventName === "status" && typeof payload !== "string") handlers.onStatus?.(payload)
     if (eventName === "token") handlers.onToken?.(typeof payload === "string" ? payload : String(payload.text ?? ""))
     if (eventName === "complete" && typeof payload !== "string") handlers.onComplete?.(payload)
+    if (eventName === "activity" && typeof payload !== "string") handlers.onActivity?.(payload)
+    if ((eventName === "block.created" || eventName === "block.updated") && typeof payload !== "string") handlers.onBlock?.(payload)
+    if (eventName === "response.started" && typeof payload !== "string") handlers.onResponseStarted?.(payload)
+    if (eventName === "response.completed" && typeof payload !== "string") handlers.onResponseCompleted?.(payload)
     if (eventName === "error") {
       const message = typeof payload === "string" ? payload : String(payload.message ?? "We couldn't complete your request. Please try again.")
       handlers.onError?.(message)

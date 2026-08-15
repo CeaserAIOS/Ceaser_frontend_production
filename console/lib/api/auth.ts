@@ -7,12 +7,17 @@ export interface AuthSession {
   id?: string
   userId?: string
   email?: string
+  display_name?: string | null
+  use_case?: string | null
+  onboarding_data?: Record<string, unknown>
+  onboarding_completed?: boolean
   access_token?: string
   refresh_token?: string
   user?: {
     id?: string
     email?: string
     name?: string | null
+    display_name?: string | null
   } | null
 }
 
@@ -91,6 +96,8 @@ export const authApi = {
   },
   getSession: () => apiRequest<AuthSession>("/auth/session"),
   getCurrentUser: () => apiRequest<AuthSession>("/auth/me"),
+  updateProfile: (display_name: string, details: Record<string, unknown> = {}) =>
+    apiRequest<AuthSession>("/auth/profile", { method: "PATCH", body: { display_name, ...details } }),
   signOut: async () => {
     await apiRequest<void>("/auth/sign-out", { method: "POST" })
     clearAuthTokens()

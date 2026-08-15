@@ -253,14 +253,13 @@ export const ceaserEngines: CeaserEngine[] = [
 ]
 
 const baseNavigationItems: NavigationItem[] = [
-  { id: "mission-control", label: "Mission Control", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "student", label: "Student Hub", icon: GraduationCap },
   { id: "agents", label: "Agents", icon: Users },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "memory", label: "Memory", icon: BrainCircuit },
-  { id: "files", label: "Files", icon: FileText },
   { id: "integrations", label: "Integrations", icon: Puzzle },
+  { id: "projects", label: "Projects", icon: FolderKanban },
+  { id: "files", label: "Files", icon: FileText },
+  { id: "memory", label: "Memory", icon: BrainCircuit },
+  { id: "mission-control", label: "Mission Control", icon: LayoutDashboard },
   { id: "settings", label: "Settings", icon: Settings },
 ]
 

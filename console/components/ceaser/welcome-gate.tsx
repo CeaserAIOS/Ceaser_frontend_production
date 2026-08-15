@@ -73,9 +73,22 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       try {
         const current = await authApi.getCurrentUser()
         if (!mounted) return
+        const storedProfile = readProfile()
+        const serverName = sessionDisplayName(current)
+        if (serverName) {
+          window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...storedProfile, name: serverName, email: sessionEmail(current) }))
+        } else if (storedProfile?.name?.trim()) {
+          const updated = await authApi.updateProfile(storedProfile.name.trim())
+          current.display_name = updated.display_name
+        }
         setSession(current)
         setEmail(sessionEmail(current))
-        const completed = hasCompletedOnboarding(sessionEmail(current))
+        const localCompleted = hasCompletedOnboarding(sessionEmail(current))
+        let completed = Boolean(current.onboarding_completed)
+        if (!completed && localCompleted && storedProfile?.name?.trim()) {
+          const restored = await authApi.updateProfile(storedProfile.name.trim(), profilePayload(storedProfile, true))
+          completed = Boolean(restored.onboarding_completed)
+        }
         if (completed) window.localStorage.setItem(ONBOARDING_KEY, "true")
         setOnboardingComplete(completed)
         setStep(completed ? "ready" : "profile")
@@ -178,8 +191,11 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
         } catch {
           setCurrentPage("mission-control")
         }
+        const completed = Boolean(next.onboarding_completed)
+        setOnboardingComplete(completed)
+        setStep(completed ? "ready" : "profile")
+        if (!completed) return
         window.localStorage.setItem(ONBOARDING_KEY, "true")
-        setOnboardingComplete(true)
         return
       }
       const completed = hasCompletedOnboarding(signedInEmail)
@@ -253,9 +269,20 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     }
   }
 
-  function saveProfile() {
+  async function saveProfile() {
+    const displayName = name.trim() || firstName
+    try {
+      await authApi.updateProfile(displayName, {
+        use_case: useCase,
+        onboarding_data: onboardingData(studentProfile, selectedVoice, useCase),
+        onboarding_completed: false,
+      })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save your name.")
+      return
+    }
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
-      name: name.trim() || firstName,
+      name: displayName,
       email: sessionEmail(session) || email,
       useCase,
       ...(useCase === "Student" ? { studentProfile: cleanStudentProfile(studentProfile) } : {}),
@@ -263,15 +290,23 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     setStep("permissions")
   }
 
-  function finishOnboarding() {
-    window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
+  async function finishOnboarding() {
+    const stored = {
       name: name.trim() || firstName,
       email: sessionEmail(session) || email,
       useCase,
       voice: selectedVoice,
       hotkey: "Hold Right Ctrl",
       ...(useCase === "Student" ? { studentProfile: cleanStudentProfile(studentProfile) } : {}),
-    }))
+    }
+    try {
+      await authApi.updateProfile(stored.name, profilePayload(stored, true))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not finish your profile setup.")
+      return
+    }
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify(stored))
+    window.localStorage.setItem(ONBOARDING_KEY, "true")
     setStep("ready")
   }
 
@@ -558,5 +593,29 @@ function cleanAuthMessage(value: string) {
 
 function sessionEmail(session?: AuthSession | null) {
   return session?.email || session?.user?.email || ""
+}
+
+function onboardingData(studentProfile: Parameters<typeof cleanStudentProfile>[0], voice: string, useCase: string) {
+  return {
+    voice,
+    hotkey: "Hold Right Ctrl",
+    ...(useCase === "Student" ? { student_profile: cleanStudentProfile(studentProfile) } : {}),
+  }
+}
+
+function profilePayload(profile: any, completed: boolean) {
+  return {
+    use_case: profile.useCase || null,
+    onboarding_data: {
+      voice: profile.voice || "",
+      hotkey: profile.hotkey || "Hold Right Ctrl",
+      ...(profile.studentProfile ? { student_profile: profile.studentProfile } : {}),
+    },
+    onboarding_completed: completed,
+  }
+}
+
+function sessionDisplayName(session?: AuthSession | null) {
+  return session?.display_name?.trim() || session?.user?.display_name?.trim() || session?.user?.name?.trim() || ""
 }
 

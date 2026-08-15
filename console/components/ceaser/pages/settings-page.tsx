@@ -106,6 +106,24 @@ const settingsSections = [
 const PROFILE_KEY = "ceaser_user_profile"
 const PREFERENCES_KEY = "ceaser_preferences"
 const COMMERCIAL_CACHE_KEY = "ceaser_commercial_cache_v1"
+type CompanionPreferences = {
+  notifications: boolean
+  conversation_style: "balanced" | "casual" | "professional"
+  humor: "off" | "low" | "medium" | "high"
+  roasting: "off" | "light" | "medium"
+  proactive_mode: "off" | "important_only" | "balanced" | "companion"
+  language: "auto" | "English" | "Telugu" | "Kannada" | "Hindi" | "Tamil" | "Malayalam"
+  code_switching: boolean
+}
+const defaultCompanionPreferences: CompanionPreferences = {
+  notifications: true,
+  conversation_style: "balanced",
+  humor: "medium",
+  roasting: "light",
+  proactive_mode: "balanced",
+  language: "auto",
+  code_switching: true,
+}
 const roleOptions = [
   { value: "Student", label: "Student", description: "Study plans, notes, exam prep" },
   { value: "Founder", label: "Founder", description: "Startups, strategy, fundraising" },
@@ -156,7 +174,7 @@ export function SettingsPage() {
   const [desktopDevices, setDesktopDevices] = useState<DesktopDevice[]>([])
   const [desktopDevicesBusy, setDesktopDevicesBusy] = useState(false)
   const [desktopDevicesMessage, setDesktopDevicesMessage] = useState("")
-  const [preferences, setPreferences] = useState({ notifications: true })
+  const [preferences, setPreferences] = useState<CompanionPreferences>(defaultCompanionPreferences)
   const [billingOverview, setBillingOverview] = useState<BillingSubscriptionOverview | null>(null)
   const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>([])
   const [commercialBusy, setCommercialBusy] = useState<string | null>(null)
@@ -185,7 +203,7 @@ export function SettingsPage() {
         useCase: savedProfile?.useCase || user.role,
       })
       setSessionActive(Boolean(getAccessToken()))
-      setPreferences({ notifications: true, ...JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) || "{}") })
+      setPreferences({ ...defaultCompanionPreferences, ...JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) || "{}") })
     } catch {
       setProfile(null)
       setSessionActive(false)
@@ -280,12 +298,13 @@ export function SettingsPage() {
     })
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const next = {
       name: profileDraft.name.trim() || getUserDisplayName(profile, user.name),
       email: profileDraft.email.trim(),
       useCase: profileDraft.useCase,
     }
+    await authApi.updateProfile(next.name)
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(next))
     setProfile(next)
   }
@@ -1565,6 +1584,25 @@ export function SettingsPage() {
                 </div>
               </div>
             </GlowCard>
+            <GlowCard>
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium">Companion conversation</p>
+                  <p className="text-sm text-muted-foreground">Control CEASER&apos;s tone, initiative, and language without changing execution behavior.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <PreferenceSelect label="Conversation style" value={preferences.conversation_style} options={["balanced", "casual", "professional"]} onChange={(value) => savePreferences({ conversation_style: value as CompanionPreferences["conversation_style"] })} />
+                  <PreferenceSelect label="Humor" value={preferences.humor} options={["off", "low", "medium", "high"]} onChange={(value) => savePreferences({ humor: value as CompanionPreferences["humor"] })} />
+                  <PreferenceSelect label="Light roasting" value={preferences.roasting} options={["off", "light", "medium"]} onChange={(value) => savePreferences({ roasting: value as CompanionPreferences["roasting"] })} />
+                  <PreferenceSelect label="Proactive CEASER" value={preferences.proactive_mode} options={["off", "important_only", "balanced", "companion"]} onChange={(value) => savePreferences({ proactive_mode: value as CompanionPreferences["proactive_mode"] })} />
+                  <PreferenceSelect label="Language" value={preferences.language} options={["auto", "English", "Telugu", "Kannada", "Hindi", "Tamil", "Malayalam"]} onChange={(value) => savePreferences({ language: value as CompanionPreferences["language"] })} />
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-background/50 p-3">
+                    <div><p className="text-sm font-medium">Code switching</p><p className="text-xs text-muted-foreground">Mix English technical terms naturally</p></div>
+                    <SettingSwitch checked={preferences.code_switching} onChange={(checked) => savePreferences({ code_switching: checked })} />
+                  </div>
+                </div>
+              </div>
+            </GlowCard>
           </div>
         )}
 
@@ -1723,6 +1761,10 @@ function SettingSwitch({ checked, disabled, onChange }: { checked: boolean; disa
       <span className={cn("block h-5 w-5 rounded-full transition-transform", checked ? "translate-x-5 bg-primary" : "bg-muted-foreground")} />
     </button>
   )
+}
+
+function PreferenceSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return <label className="block rounded-xl border border-border bg-background/50 p-3"><span className="mb-2 block text-sm font-medium">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary">{options.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}</select></label>
 }
 
 function RangeSetting({

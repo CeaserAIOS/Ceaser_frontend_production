@@ -53,7 +53,7 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [currentPage, setCurrentPage] = useState<AppPage>("mission-control")
+  const [currentPage, setCurrentPage] = useState<AppPage>("chat")
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)

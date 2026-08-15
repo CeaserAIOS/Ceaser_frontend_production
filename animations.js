@@ -932,17 +932,6 @@
     var cfg = window.CEASER_CONFIG;
     if (!cfg || cfg.LAUNCHED) return;
     var path = window.location.pathname;
-    var params = new URLSearchParams(window.location.search);
-    var bypassKeys = cfg.ADMIN_BYPASS_KEYS || [];
-    var hasBypass = bypassKeys.some(function (key) {
-      return params.has(key) || window.localStorage.getItem("ceaser_" + key + "_access") === "true";
-    });
-    if (hasBypass) {
-      bypassKeys.forEach(function (key) {
-        if (params.has(key)) window.localStorage.setItem("ceaser_" + key + "_access", "true");
-      });
-      return;
-    }
     var isProtected = cfg.PROTECTED_ROUTES.some(function (p) {
       return path === p || path.indexOf(p + "/") === 0;
     });

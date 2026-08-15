@@ -9,6 +9,7 @@ import { useApp } from "@/lib/app-context"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
 import { CeaserLogo } from "../ceaser-logo"
+import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
 import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, FileText, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
@@ -28,6 +29,7 @@ interface Message {
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
   documentRequest?: DocumentRequest
+  richResponse?: CeaserChatResponse["rich_response"]
   isTyping?: boolean
   isStreaming?: boolean
   statusLabel?: string
@@ -143,6 +145,7 @@ const responseToMessage = (messageId: string, response: CeaserChatResponse): Mes
     workflow: normalized.workflow,
     context_summary: normalized.context_summary,
     suggestions: normalized.suggestions,
+    rich_response: normalized.rich_response,
   }
 
   return {
@@ -158,6 +161,7 @@ const responseToMessage = (messageId: string, response: CeaserChatResponse): Mes
     research: normalized.research,
     workflow: normalized.workflow,
     highlights: buildHighlights(metadata),
+    richResponse: normalized.rich_response,
   }
 }
 
@@ -198,6 +202,7 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
     contributionSummary: metadata.contribution_summary,
     research: metadata.research,
     workflow: metadata.workflow,
+    richResponse: metadata.rich_response,
   }
 }
 
@@ -826,7 +831,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className={cn("relative flex h-full overflow-hidden text-foreground", "bg-[#050816]")}>
+    <div className={cn("ceaser-chat relative flex h-full overflow-hidden text-foreground", "bg-[#050816]")}>
       <div className={cn("pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.18)_1px,transparent_1px)] [background-size:36px_36px]", "opacity-[0.08]")} />
       <div className={cn("pointer-events-none absolute inset-0", "bg-[radial-gradient(circle_at_18%_0%,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(0,212,255,0.08),transparent_32%)]")} />
 
@@ -851,7 +856,7 @@ export function ChatPage() {
           <button
             onClick={() => void handleNewChat()}
             className={cn(
-              "flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 text-sm font-semibold text-black transition hover:bg-cyan-300",
+              "ceaser-primary-action flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white transition",
               chatSidebarCollapsed && "rounded-full px-0",
             )}
           >
@@ -1001,18 +1006,17 @@ export function ChatPage() {
             )}
             {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
-                <h1 className="text-left text-[38px] font-light leading-[1.08] tracking-[-0.03em] text-white md:text-[44px]">
-                  {`Hey! ${displayName}`}
-                  <br />
-                  <span className="text-white/82">What can I help with?</span>
+                <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm text-white/70">Good to see you, {displayName}</div>
+                <h1 className="text-left text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
+                  How can <span className="ceaser-gradient-text">I help you today?</span>
                 </h1>
 
                 <div className={cn("mt-7 grid gap-4", ENABLE_CHAT_SUGGESTIONS ? "md:grid-cols-3" : "md:grid-cols-2")}>
-                  <PromptCard color="cyan" title="Content Help" text="Help with me create a Presentation" onClick={() => setInput("Help me create a presentation about ")} />
+                  <PromptCard color="cyan" title="Create Presentation" text="Build a polished slide deck" onClick={() => setInput("Help me create a presentation about ")} />
                   {ENABLE_CHAT_SUGGESTIONS ? (
                     <PromptCard color="rose" title="Suggestions" text="Help with me ideas" onClick={() => setInput("Give me suggestions for ")} />
                   ) : null}
-                  <PromptCard color="green" title="Job Application" text="Help with me apply for job application" onClick={() => setInput("Help me prepare a job application for ")} />
+                  <PromptCard color="green" title="Write Document" text="Draft a structured document" onClick={() => setInput("Help me write a document about ")} />
                 </div>
 
                 <div className="mt-7">
@@ -1066,7 +1070,7 @@ export function ChatPage() {
               </div>
             ) : null}
 
-            <div className="mx-auto flex min-h-[60px] w-full max-w-[1180px] items-center gap-3 rounded-full bg-white/[0.045] px-4 backdrop-blur-2xl">
+            <div className="ceaser-composer mx-auto flex min-h-[68px] w-full max-w-[1180px] items-center gap-3 rounded-lg px-4 backdrop-blur-2xl">
               <input
                 ref={chatFileInputRef}
                 type="file"
@@ -1087,7 +1091,7 @@ export function ChatPage() {
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && handleSend()}
-                placeholder="Tell me what do you want?"
+                placeholder="Ask anything or give a command..."
                 disabled={isLoading}
                 className="h-12 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/45 disabled:opacity-50"
               />
@@ -1285,7 +1289,9 @@ function ChatBubble({
           </div>
         ) : (
           <>
-            {message.role === "assistant" && message.isStreaming && message.content.trimStart().startsWith("{")
+            {message.role === "assistant" && !message.isStreaming && message.richResponse
+              ? <RichResponseRenderer response={message.richResponse} onAction={onPromptSelect} />
+              : message.role === "assistant" && message.isStreaming && message.content.trimStart().startsWith("{")
               ? <div className="flex items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-sm text-cyan-100"><Loader2 className="h-4 w-4 animate-spin" /> Structuring CEASER's response…</div>
               : message.role === "assistant" && !message.isStreaming && parseProjectReport(message.content)
                 ? <ProjectReportCard report={parseProjectReport(message.content)!} />
@@ -1406,10 +1412,8 @@ function ResponseActions({
     const backendSuggestions = safeArray(message.metadata?.suggestions)
       .map((item) => (typeof item === "string" ? item : item?.text))
       .filter((item): item is string => Boolean(item))
-    if (backendSuggestions.length) return backendSuggestions.slice(0, 5)
-    if (message.isStreaming) return []
-    return getProactiveSuggestions(previousUserPrompt ?? "", content)
-  }, [message.metadata?.suggestions, previousUserPrompt, content, message.isStreaming])
+    return backendSuggestions.slice(0, 5)
+  }, [message.metadata?.suggestions])
 
   useEffect(() => {
     try {
@@ -1547,78 +1551,6 @@ function getContextualActions(content: string): Array<Omit<ResponseAction, "run"
     add("gmail", "Open in Gmail", Mail)
   }
   return actions.slice(0, 4)
-}
-
-function getProactiveSuggestions(prompt: string, content: string) {
-  const promptLower = prompt.toLowerCase()
-  const contentLower = content.toLowerCase()
-  const combined = `${promptLower}\n${contentLower}`
-
-  if (/(email|subject:|dear |regards|cover letter|application|mail)/i.test(combined)) {
-    return [
-      "Make this email shorter and sharper.",
-      "Rewrite this in a more professional tone.",
-      "Turn this into a follow-up email.",
-    ]
-  }
-
-  if (/(study|timetable|time table|schedule|revision|exam|flashcard|mcq|notes|learning)/i.test(combined)) {
-    return [
-      "Turn this into a simple study checklist.",
-      "Make this into a day-wise timetable.",
-      "Create revision questions from this.",
-    ]
-  }
-
-  if (/(research|analysis|market|competitor|report|sources|citation|latest|compare)/i.test(combined)) {
-    return [
-      "Summarize the main takeaways in simple language.",
-      "What should I do next based on this?",
-      "Turn this into an action plan.",
-    ]
-  }
-
-  if (/(plan|roadmap|strategy|workflow|project|execution|milestone)/i.test(combined)) {
-    return [
-      "Break this into weekly milestones.",
-      "Turn this into a step-by-step execution checklist.",
-      "What are the biggest risks in this plan?",
-    ]
-  }
-
-  if (/(mahabharata|krishna|gita|ramayana|mythology|epic|vyuha|kurukshetra|ravana|ravanasura|lanka)/i.test(combined)) {
-    return [
-      "Explain Ravana's character.",
-      "Compare Rama and Ravana.",
-      "Give the life lessons here.",
-    ]
-  }
-
-  if (/(resume|cv|interview|job|career|application role)/i.test(combined)) {
-    return [
-      "Make this more recruiter-friendly.",
-      "Turn this into an interview prep checklist.",
-      "Highlight the strongest points only.",
-    ]
-  }
-
-  if (/(document|pdf|report|summary|summarize|explain this file)/i.test(combined)) {
-    return [
-      "Give me the key points only.",
-      "Make this easier for a beginner.",
-      "Turn this into action items.",
-    ]
-  }
-
-  if (combined.trim().length > 0) {
-    return [
-      "Explain this more simply.",
-      "Give me a practical example.",
-      "What should I do next?",
-    ]
-  }
-
-  return []
 }
 
 function runContextAction(id: string, content: string) {

@@ -6,15 +6,12 @@ import { ShieldCheck } from "lucide-react"
 import favicon from "@/public/favicon.png"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
 import { useApp } from "@/lib/app-context"
-import { useAgentStore } from "@/lib/stores/agent-store"
-import { ceaserAgents, navigationItems } from "@/lib/ceaser"
+import { navigationItems } from "@/lib/ceaser"
 import { adminApi } from "@/lib/api/admin"
-import { AgentAvatar } from "./agent-avatar"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
   const { currentPage, setCurrentPage, setSelectedAgentId, sidebarCollapsed, setSidebarCollapsed } = useApp()
-  const { isAgentEnabled } = useAgentStore()
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -55,12 +52,17 @@ export function Sidebar() {
       onMouseEnter={expandSidebar}
       onMouseLeave={collapseSidebar}
       className={cn(
-        "spatial-panel flex h-[calc(100vh-1.5rem)] transform-gpu flex-col rounded-[1.65rem] will-change-[width] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "spatial-panel flex h-[calc(100vh-1rem)] transform-gpu flex-col rounded-lg will-change-[width] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         sidebarCollapsed ? "w-16" : "w-56"
       )}
     >
       {/* Logo */}
-      <div className="flex h-20 items-center justify-center border-b border-border px-4 py-3 transition-[padding] duration-200">
+      <button
+        type="button"
+        onClick={() => setCurrentPage("chat")}
+        className="flex h-20 w-full items-center justify-center border-b border-border px-4 py-3 transition-[padding,background-color] duration-200 hover:bg-white/[0.035]"
+        aria-label="Open a new CEASER chat"
+      >
         {sidebarCollapsed ? (
           <Image
             src={favicon}
@@ -80,7 +82,7 @@ export function Sidebar() {
             priority
           />
         )}
-      </div>
+      </button>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2">
@@ -107,32 +109,6 @@ export function Sidebar() {
           })}
         </div>
 
-        {/* Agents Section */}
-        {!sidebarCollapsed && (
-          <div className="mt-6">
-            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Agents
-            </p>
-            <div className="space-y-1">
-              {ceaserAgents.filter((agent) => agent.id !== "ceaser").map((agent) => (
-                <button
-                  key={agent.id}
-                  onClick={() => {
-                    setSelectedAgentId(agent.id)
-                    setCurrentPage("agents")
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
-                >
-                  <AgentAvatar agent={agent} size="sm" showStatus enabled={isAgentEnabled(agent.id)} />
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-foreground">{agent.name}</p>
-                    <p className="text-xs text-muted-foreground">{agent.role}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </nav>
 
     </aside>

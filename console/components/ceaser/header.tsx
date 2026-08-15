@@ -121,7 +121,7 @@ export function Header() {
   }
 
   return (
-    <header className="relative z-30 m-3 mb-0 flex h-16 min-w-0 items-center justify-between gap-4 rounded-2xl border border-border bg-card/78 px-5 shadow-[0_18px_55px_rgba(0,0,0,0.14)] backdrop-blur-md">
+    <header className="relative z-30 m-3 mb-0 flex h-14 min-w-0 items-center justify-between gap-4 rounded-lg border border-border bg-card/72 px-5 backdrop-blur-md">
       <div className="flex min-w-0 flex-1 items-center gap-4">
         <span className="hidden shrink-0 text-sm font-medium text-muted-foreground md:inline">{pageTitle}</span>
         <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Unified AI OS</span>

@@ -12,7 +12,7 @@ import { CeaserLogo } from "../ceaser-logo"
 import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Copy, Edit3, FileText, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, Pin, PinOff, Plus, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, BarChart3, Bookmark, Bot, Brain, CalendarPlus, Check, CheckCircle2, ChevronDown, ChevronLeft, Code2, Copy, Edit3, FileText, Globe2, Lightbulb, Loader2, Mail, MessageSquare, Mic, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -60,6 +60,22 @@ const creationActions = [
   { title: "Create Report", subtitle: "Research & insights", prompt: "Create a report about " },
   { title: "Create Study Notes", subtitle: "Notes, MCQs, more", prompt: "Create study notes for " },
   { title: "Create Excel Sheet", subtitle: "Tables & trackers", prompt: "Create an Excel tracker for " },
+]
+
+const launchActions = [
+  { title: "Create Presentation", subtitle: "Make a slide deck", icon: Presentation, color: "text-fuchsia-300 bg-fuchsia-500/12", prompt: "Create a presentation about " },
+  { title: "Write Document", subtitle: "Draft anything", icon: FileText, color: "text-blue-300 bg-blue-500/12", prompt: "Write a document about " },
+  { title: "Analyze Data", subtitle: "Insights & trends", icon: BarChart3, color: "text-emerald-300 bg-emerald-500/12", prompt: "Analyze this data: " },
+  { title: "Code Something", subtitle: "Generate code", icon: Code2, color: "text-orange-300 bg-orange-500/12", prompt: "Build " },
+  { title: "Brainstorm Ideas", subtitle: "Creative thinking", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12", prompt: "Brainstorm ideas for " },
+]
+
+const launchAgents = [
+  { name: "Researcher", subtitle: "Find & analyze information", icon: Search, color: "text-violet-300 bg-violet-500/12" },
+  { name: "Writer", subtitle: "Write content & copy", icon: PenLine, color: "text-blue-300 bg-blue-500/12" },
+  { name: "Analyst", subtitle: "Analyze data & trends", icon: BarChart3, color: "text-emerald-300 bg-emerald-500/12" },
+  { name: "Developer", subtitle: "Code & build", icon: Code2, color: "text-orange-300 bg-orange-500/12" },
+  { name: "Designer", subtitle: "Design & creative", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12" },
 ]
 
 const agentNameToId = (name: string) => name.toLowerCase()
@@ -838,11 +854,11 @@ export function ChatPage() {
       <aside
         className={cn(
           "relative z-20 flex h-full shrink-0 flex-col border-r border-border bg-card/72 backdrop-blur-xl transition-all duration-300",
-          chatSidebarCollapsed ? "w-[76px]" : "w-[292px]",
+          chatSidebarCollapsed ? "w-[76px]" : "w-[344px]",
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4">
-          {!chatSidebarCollapsed && <p className="text-sm font-semibold tracking-wide text-foreground">Chats</p>}
+        <div className="flex h-20 items-center justify-between border-b border-white/[0.07] px-5">
+          {!chatSidebarCollapsed && <div className="flex items-center gap-3"><CeaserLogo className="h-9 w-9" /><p className="text-lg font-semibold tracking-[0.08em] text-white">CEASER</p></div>}
           <button
             onClick={() => setChatSidebarCollapsed((value) => !value)}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary/45 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
@@ -873,13 +889,13 @@ export function ChatPage() {
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search conversations..."
+                placeholder="Search chats..."
                   className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2 px-3">
+            <div className="mt-3 grid grid-cols-4 gap-1 px-3">
               <button
                 onClick={() => {
                   setShowSavedResponses(false)
@@ -887,7 +903,7 @@ export function ChatPage() {
                 }}
                 className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", !showArchivedChats && !showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
               >
-                Active
+                All
               </button>
               <button
                 onClick={() => {
@@ -896,7 +912,7 @@ export function ChatPage() {
                 }}
                 className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", showArchivedChats && !showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
               >
-                Archived
+                Pinned
               </button>
               <button
                 onClick={() => {
@@ -905,8 +921,9 @@ export function ChatPage() {
                 }}
                 className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
               >
-                Saved
+                Today
               </button>
+              <button className="rounded-xl px-2 py-2 text-xs font-medium text-muted-foreground transition hover:bg-secondary/70 hover:text-foreground">This Week</button>
             </div>
           </>
         )}
@@ -991,13 +1008,14 @@ export function ChatPage() {
       </aside>
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
-        <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6 lg:px-8">
+        <section className="relative flex min-h-0 w-full flex-1 flex-col px-8 pb-5 lg:px-16">
+          {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button><button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#080d1a]"><Bot className="h-4 w-4 text-cyan-300" /></button></div> : null}
           <div
             ref={chatScrollRef}
             onScroll={captureScrollPosition}
             onWheel={stopFollowingStream}
             onTouchStart={stopFollowingStream}
-            className={cn("min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[17vh]")}
+            className={cn("min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-3", messages.length || isBooting || isActiveChatLoading ? "pt-10" : "pt-[9vh]")}
           >
             {loadError && (
               <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -1006,34 +1024,26 @@ export function ChatPage() {
             )}
             {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
-                <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">Good to see you, {displayName}</div>
-                <h1 className="text-left text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
+                <div className="mx-auto mb-6 flex w-fit rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-sm text-white/80">Good afternoon, {displayName} 👋</div>
+                <h1 className="text-center text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
                   How can <span className="ceaser-gradient-text">I help you today?</span>
                 </h1>
 
-                <div className={cn("mt-7 grid gap-4", ENABLE_CHAT_SUGGESTIONS ? "md:grid-cols-3" : "md:grid-cols-2")}>
-                  <PromptCard color="cyan" title="Create Presentation" text="Build a polished slide deck" onClick={() => setInput("Help me create a presentation about ")} />
-                  {ENABLE_CHAT_SUGGESTIONS ? (
-                    <PromptCard color="rose" title="Suggestions" text="Help with me ideas" onClick={() => setInput("Give me suggestions for ")} />
-                  ) : null}
-                  <PromptCard color="green" title="Write Document" text="Draft a structured document" onClick={() => setInput("Help me write a document about ")} />
-                </div>
-
-                <div className="mt-7">
-                  <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-white/38">Quick Actions</p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {creationActions.map((action) => (
-                      <button
-                        key={action.title}
-                        onClick={() => setInput(action.prompt)}
-                        className="rounded-2xl border border-white/[0.025] bg-white/[0.035] px-4 py-3 text-left transition hover:border-white/[0.08] hover:bg-white/[0.07]"
-                      >
-                        <p className="text-sm font-medium text-white">{action.title}</p>
-                        <p className="mt-1 text-xs text-white/42">{action.subtitle}</p>
-                      </button>
-                    ))}
+                <div className="ceaser-composer mx-auto mt-10 flex min-h-[156px] w-full max-w-[980px] flex-col rounded-[22px] p-5 backdrop-blur-2xl">
+                  <input ref={chatFileInputRef} type="file" className="hidden" accept=".pdf,.docx,.pptx,.xlsx,.txt,.png,.jpg,.jpeg" onChange={(event) => void handleChatFileUpload(event)} />
+                  <input ref={chatComposerRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && handleSend()} placeholder="Ask anything or give a command..." className="min-h-14 w-full bg-transparent text-base text-white outline-none placeholder:text-white/50" />
+                  <div className="mt-auto flex items-center gap-3">
+                    <button onClick={() => chatFileInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/70"><Plus className="h-5 w-5" /></button>
+                    <button className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-4 text-sm text-white/80"><Globe2 className="h-4 w-4" />Web search<ChevronDown className="h-4 w-4" /></button>
+                    <button className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-4 text-sm text-white/80"><Brain className="h-4 w-4" />Think<ChevronDown className="h-4 w-4" /></button>
+                    <button className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/80"><Mic className="h-5 w-5" /></button>
+                    <button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-[0_0_28px_rgba(0,174,255,.35)] disabled:opacity-45"><Send className="h-5 w-5" /></button>
                   </div>
                 </div>
+
+                <div className="mx-auto mt-6 grid w-full max-w-[980px] grid-cols-2 gap-3 lg:grid-cols-5">{launchActions.map(({ title, subtitle, icon: Icon, color, prompt }) => <button key={title} onClick={() => setInput(prompt)} className="rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/30"><span className={cn("mb-4 flex h-9 w-9 items-center justify-center rounded-lg", color)}><Icon className="h-5 w-5" /></span><p className="text-sm font-medium text-white">{title}</p><p className="mt-1 text-xs text-white/45">{subtitle}</p></button>)}</div>
+                <div className="mx-auto mt-9 w-full max-w-[980px]"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium text-white">Your Agents</h2><button className="rounded-full border border-white/10 px-4 py-2 text-xs text-cyan-200">View all</button></div><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div></div>
+                <p className="mt-8 text-center text-xs text-white/38">CEASER can make mistakes. Verify important information.</p>
               </>
             ) : (
               <div className="mx-auto w-full max-w-[1180px] space-y-7">
@@ -1057,7 +1067,7 @@ export function ChatPage() {
             )}
           </div>
 
-          <div className="pt-4">
+          <div className={cn("pt-4", !messages.length && !isBooting && !isActiveChatLoading && "hidden")}>
             {attachedFiles.length ? (
               <div className="mb-2 flex flex-wrap gap-2">
                 {attachedFiles.map((file) => (

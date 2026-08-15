@@ -46,6 +46,7 @@ export function Sidebar() {
   const visibleNavigation = isAdmin
     ? [...navigationItems, { id: "admin" as const, label: "Admin", icon: ShieldCheck }]
     : navigationItems
+  const chatNavigation = currentPage === "chat"
 
   return (
     <aside 
@@ -53,7 +54,7 @@ export function Sidebar() {
       onMouseLeave={collapseSidebar}
       className={cn(
         "spatial-panel flex h-[calc(100vh-1rem)] transform-gpu flex-col rounded-lg will-change-[width] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
-        sidebarCollapsed ? "w-16" : "w-56"
+        chatNavigation ? "w-24" : sidebarCollapsed ? "w-16" : "w-56"
       )}
     >
       {/* Logo */}
@@ -63,7 +64,7 @@ export function Sidebar() {
         className="flex h-20 w-full items-center justify-center border-b border-border px-4 py-3 transition-[padding,background-color] duration-200 hover:bg-white/[0.035]"
         aria-label="Open a new CEASER chat"
       >
-        {sidebarCollapsed ? (
+        {sidebarCollapsed || chatNavigation ? (
           <Image
             src={favicon}
             alt="CEASER"
@@ -99,11 +100,11 @@ export function Sidebar() {
                   isActive 
                     ? "spatial-active-glow bg-primary/15 text-primary" 
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                  sidebarCollapsed && "justify-center px-0"
+                  (sidebarCollapsed || chatNavigation) && "flex-col justify-center gap-1 px-0 py-3 text-[11px]"
                 )}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
+                {(!sidebarCollapsed || chatNavigation) && <span>{item.label}</span>}
               </button>
             )
           })}

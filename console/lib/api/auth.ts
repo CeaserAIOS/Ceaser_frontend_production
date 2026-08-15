@@ -65,6 +65,7 @@ export const authApi = {
     return { access_token: accessToken, refresh_token: refreshToken }
   },
   signInWithGoogle: () => {
+    clearAuthTokens()
     const runtimeConfig = typeof window !== "undefined" ? (window as any).CEASER_CONFIG : undefined
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || runtimeConfig?.SUPABASE_URL || "https://rrfqqgxhmimffrcckxay.supabase.co"
     if (!supabaseUrl || typeof window === "undefined") {
@@ -80,7 +81,8 @@ export const authApi = {
       ? `${appUrl}/auth/callback/?desktop_link=1`
       : `${appUrl}/auth/callback/`
     const redirectTo = encodeURIComponent(callbackUrl)
-    window.location.href = `${supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`
+    const queryParams = encodeURIComponent(JSON.stringify({ prompt: "select_account" }))
+    window.location.href = `${supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}&query_params=${queryParams}`
   },
   signup: async (email: string, password: string) => {
     clearAuthTokens()

@@ -1,13 +1,22 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { CircleCheck, ArrowRight } from "lucide-react"
+import { authApi } from "@/lib/api/auth"
 
 export default function VerifiedPage() {
+  const [returning, setReturning] = useState(false)
+
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname + window.location.search)
+    try {
+      const session = authApi.consumeOAuthRedirect()
+      if (!session?.access_token) return
+      setReturning(true)
+      if (authApi.isDesktopLinkRequest() && authApi.completeDesktopLink(session)) return
+      window.location.replace(`${window.location.origin}/console/`)
+    } catch {
+      window.location.replace(`${window.location.origin}/console/?auth_error=oauth_callback`)
     }
   }, [])
 
@@ -17,11 +26,13 @@ export default function VerifiedPage() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
           <CircleCheck className="h-8 w-8" />
         </div>
-        <h1 className="mt-6 text-3xl font-bold">You are verified</h1>
+        <h1 className="mt-6 text-3xl font-bold">{returning ? "Signing you in" : "You are verified"}</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Your email has been verified successfully. Return to CEASER and sign in to continue.
+          {returning
+            ? "Your Google account is connected. Returning to CEASER..."
+            : "Your email has been verified successfully. Return to CEASER and sign in to continue."}
         </p>
-        <div className="mt-8 flex justify-center">
+        {!returning && <div className="mt-8 flex justify-center">
           <button
             type="button"
             onClick={() => {
@@ -33,7 +44,7 @@ export default function VerifiedPage() {
             Go back and sign in
             <ArrowRight className="h-4 w-4" />
           </button>
-        </div>
+        </div>}
       </div>
     </main>
   )

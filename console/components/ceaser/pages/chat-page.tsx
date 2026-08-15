@@ -831,7 +831,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className={cn("ceaser-chat relative flex h-full overflow-hidden text-foreground", "bg-[#050816]")}>
+    <div className={cn("ceaser-chat relative flex h-full overflow-hidden text-foreground", "bg-[#040714]")}>
       <div className={cn("pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.18)_1px,transparent_1px)] [background-size:36px_36px]", "opacity-[0.08]")} />
       <div className={cn("pointer-events-none absolute inset-0", "bg-[radial-gradient(circle_at_18%_0%,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(0,212,255,0.08),transparent_32%)]")} />
 
@@ -991,7 +991,7 @@ export function ChatPage() {
       </aside>
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
-        <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6">
+        <section className="flex min-h-0 w-full flex-1 flex-col px-8 pb-6 lg:px-8">
           <div
             ref={chatScrollRef}
             onScroll={captureScrollPosition}
@@ -1006,7 +1006,7 @@ export function ChatPage() {
             )}
             {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
-                <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm text-white/70">Good to see you, {displayName}</div>
+                <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">Good to see you, {displayName}</div>
                 <h1 className="text-left text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
                   How can <span className="ceaser-gradient-text">I help you today?</span>
                 </h1>
@@ -1026,7 +1026,7 @@ export function ChatPage() {
                       <button
                         key={action.title}
                         onClick={() => setInput(action.prompt)}
-                        className="rounded-2xl bg-white/[0.035] px-4 py-3 text-left transition hover:bg-white/[0.07]"
+                        className="rounded-2xl border border-white/[0.025] bg-white/[0.035] px-4 py-3 text-left transition hover:border-white/[0.08] hover:bg-white/[0.07]"
                       >
                         <p className="text-sm font-medium text-white">{action.title}</p>
                         <p className="mt-1 text-xs text-white/42">{action.subtitle}</p>

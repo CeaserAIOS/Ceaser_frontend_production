@@ -170,8 +170,25 @@
     position: relative;
     border: 1px solid transparent;
     background: linear-gradient(#0a1020, #0a1020) padding-box,
-      linear-gradient(100deg, rgba(35, 210, 255, .85), rgba(82, 108, 255, .78), rgba(185, 86, 255, .78)) border-box;
-    box-shadow: 0 18px 55px rgba(0, 0, 0, .28), 0 0 24px rgba(83, 99, 255, .08);
+      linear-gradient(100deg, #19d8ff 0%, #4388ff 22%, #745cff 42%, #d55cff 55%, #745cff 70%, #19d8ff 100%) border-box;
+    background-size: 100% 100%, 300% 100%;
+    background-position: 0 0, 0% 50%;
+    box-shadow: 0 18px 55px rgba(0, 0, 0, .32), 0 0 22px rgba(60, 126, 255, .1);
+    animation: ceaser-composer-border-flow 5.5s linear infinite;
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .ceaser-composer:focus-within {
+    box-shadow: 0 20px 62px rgba(0, 0, 0, .36), 0 0 26px rgba(34, 211, 238, .14), 0 0 34px rgba(168, 85, 247, .12);
+  }
+
+  @keyframes ceaser-composer-border-flow {
+    from { background-position: 0 0, 0% 50%; }
+    to { background-position: 0 0, 300% 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ceaser-composer { animation: none; }
   }
 
   .ceaser-chat aside { background: rgba(7, 13, 27, .84); }

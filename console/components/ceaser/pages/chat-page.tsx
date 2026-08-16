@@ -181,6 +181,12 @@ const responseToMessage = (messageId: string, response: CeaserChatResponse): Mes
   }
 }
 
+const hasStructuredRichContent = (response: CeaserChatResponse["rich_response"]) => {
+  if (!response?.blocks?.length) return false
+  const structuredTypes = new Set(["code", "table", "chart", "image", "generated_image", "image_group", "file", "project"])
+  return response.blocks.some((block) => structuredTypes.has(String(block.type ?? "").toLowerCase()))
+}
+
 const metadataFromRecord = (message: ChatMessage): MessageMetadata => {
   const recordWithAlias = message as ChatMessage & { extra_metadata?: MessageMetadata }
   const metadata = message.metadata ?? recordWithAlias.extra_metadata ?? {}
@@ -1305,7 +1311,7 @@ function ChatBubble({
           <>
           <div className={cn(isUser ? "rounded-2xl border border-violet-500/45 bg-gradient-to-br from-violet-500/[0.16] to-purple-900/[0.16] px-5 py-4 shadow-[0_14px_45px_rgba(76,29,149,.12)]" : "rounded-2xl border border-white/[0.12] bg-[#080d1b]/76 p-5 shadow-[0_20px_60px_rgba(0,0,0,.2)]")}>
             {isUser && <div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-violet-300">You</span><span className="text-white/45">{message.timestamp}</span></div>}
-            {message.role === "assistant" && !message.isStreaming && message.richResponse
+            {message.role === "assistant" && !message.isStreaming && message.richResponse && hasStructuredRichContent(message.richResponse)
               ? <RichResponseRenderer response={message.richResponse} onAction={onPromptSelect} />
               : message.role === "assistant" && message.isStreaming && message.content.trimStart().startsWith("{")
               ? <div className="flex items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-sm text-cyan-100"><Loader2 className="h-4 w-4 animate-spin" /> Structuring CEASER's response…</div>

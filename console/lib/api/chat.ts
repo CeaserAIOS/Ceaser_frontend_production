@@ -213,5 +213,8 @@ export const chatApi = {
         onComplete: (payload) => handlers.onComplete?.(payload as unknown as CeaserChatResponse),
         onError: handlers.onError,
       },
-    ),
+    ).then((result) => {
+      invalidateApiCache(["/conversations", conversationId ? `/chat/conversations/${conversationId}/messages` : "/chat/conversations"])
+      return result
+    }),
 }

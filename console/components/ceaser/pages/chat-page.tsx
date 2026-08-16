@@ -701,7 +701,25 @@ export function ChatPage() {
         }
       }
       if (!response) throw new Error("We couldn't complete your request. Please try again.")
-      const assistantMessage = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
+      let assistantMessage: Message = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
+      // The streaming completion payload can be intentionally compact. The
+      // persisted turn is authoritative and contains the final rich-response
+      // metadata that a page reload would otherwise be required to restore.
+      if (conversationId) {
+        try {
+          const persistedMessages = await chatApi.listMessages(conversationId, 12)
+          const persistedAssistant = [...persistedMessages].reverse().find((message) => message.role === "assistant")
+          if (persistedAssistant) {
+            assistantMessage = {
+              ...normalizeMessage(persistedAssistant),
+              id: typingMessage.id,
+              documentRequest: documentRequest ?? undefined,
+            }
+          }
+        } catch {
+          // Keep the completed streamed response when hydration is unavailable.
+        }
+      }
       setMessages((current) => {
         const next = current.map((message) => (message.id === typingMessage.id ? { ...assistantMessage, isTyping: false, isStreaming: false } : message))
         if (conversationId) conversationCacheRef.current.set(conversationId, next)

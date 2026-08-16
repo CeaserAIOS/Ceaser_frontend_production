@@ -12,7 +12,7 @@ import { CeaserLogo } from "../ceaser-logo"
 import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, BarChart3, Bookmark, Bot, Brain, CalendarPlus, Check, CheckCircle2, ChevronDown, ChevronLeft, Code2, Copy, Edit3, FileText, Globe2, Lightbulb, Loader2, Mail, MessageSquare, Mic, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, SlidersHorizontal, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Edit3, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -39,6 +39,7 @@ const ACTIVE_CONVERSATION_KEY = "ceaser_active_conversation_id"
 const SAVED_RESPONSES_KEY = "ceaser_saved_responses"
 const SAVED_RESPONSE_EVENT = "ceaser_saved_response"
 const ENABLE_CHAT_SUGGESTIONS = false
+type ConversationFilter = "all" | "pinned" | "today" | "week"
 
 interface SavedResponse {
   id: string
@@ -236,6 +237,7 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("all")
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<FileRecord[]>([])
@@ -280,9 +282,25 @@ export function ChatPage() {
 
   const filteredConversations = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
-    if (!query) return conversations
-    return conversations.filter((conversation) => conversation.title.toLowerCase().includes(query) || messages.some((message) => message.content.toLowerCase().includes(query)))
-  }, [conversations, messages, searchQuery])
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const startOfWeek = new Date(startOfToday)
+    startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7))
+    return conversations.filter((conversation) => {
+      const createdAt = new Date(conversation.created_at).getTime()
+      const matchesFilter = conversationFilter === "all"
+        || (conversationFilter === "pinned" && conversation.pinned)
+        || (conversationFilter === "today" && createdAt >= startOfToday)
+        || (conversationFilter === "week" && createdAt >= startOfWeek.getTime())
+      const matchesQuery = !query || conversation.title.toLowerCase().includes(query)
+      return matchesFilter && matchesQuery
+    })
+  }, [conversationFilter, conversations, searchQuery])
+
+  const activeConversation = useMemo(
+    () => conversations.find((item) => item.id === activeConversationId) ?? null,
+    [activeConversationId, conversations],
+  )
 
   const filteredSavedResponses = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
@@ -500,9 +518,15 @@ export function ChatPage() {
   }
 
   const handleTogglePinConversation = async (conversation: ConversationRecord) => {
-    const updated = await chatApi.updateConversation(conversation.id, { pinned: !conversation.pinned })
-    setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => Number(b.pinned) - Number(a.pinned)))
-    setOpenConversationMenuId(null)
+    try {
+      const updated = await chatApi.updateConversation(conversation.id, { pinned: !conversation.pinned })
+      setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => Number(b.pinned) - Number(a.pinned)))
+      setLoadError(null)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not update the pinned chat.")
+    } finally {
+      setOpenConversationMenuId(null)
+    }
   }
 
   const handleArchiveConversation = async (conversation: ConversationRecord) => {
@@ -920,34 +944,19 @@ export function ChatPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-4 gap-1 px-3">
-              <button
-                onClick={() => {
-                  setShowSavedResponses(false)
-                  setShowArchivedChats(false)
-                }}
-                className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", !showArchivedChats && !showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
-              >
-                All
-              </button>
-              <button
-                onClick={() => {
-                  setShowSavedResponses(false)
-                  setShowArchivedChats(true)
-                }}
-                className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", showArchivedChats && !showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
-              >
-                Pinned
-              </button>
-              <button
-                onClick={() => {
-                  setShowArchivedChats(false)
-                  setShowSavedResponses(true)
-                }}
-                className={cn("rounded-xl px-3 py-2 text-xs font-medium transition", showSavedResponses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
-              >
-                Today
-              </button>
-              <button className="rounded-xl px-2 py-2 text-xs font-medium text-muted-foreground transition hover:bg-secondary/70 hover:text-foreground">This Week</button>
+              {([["all", "All"], ["pinned", "Pinned"], ["today", "Today"], ["week", "This Week"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => {
+                    setShowSavedResponses(false)
+                    setShowArchivedChats(false)
+                    setConversationFilter(value)
+                  }}
+                  className={cn("rounded-xl px-2 py-2 text-xs font-medium transition", conversationFilter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </>
         )}
@@ -1033,8 +1042,8 @@ export function ChatPage() {
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="relative flex min-h-0 w-full flex-1 flex-col px-8 pb-5 lg:px-16">
-          {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{conversations.find((item) => item.id === activeConversationId)?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1><button className="ml-3 text-white/55" title="Favorite conversation"><Star className="h-4 w-4" /></button><div className="ml-auto flex items-center gap-3"><button className="flex h-10 w-10 items-center justify-center rounded-full text-white/55 hover:bg-white/[0.06]"><SlidersHorizontal className="h-4 w-4" /></button><button className="flex h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-sm text-white/80"><Share2 className="h-4 w-4" />Share</button><button className="flex h-10 w-10 items-center justify-center rounded-full text-white/60"><MoreHorizontal className="h-5 w-5" /></button></div></header> : null}
-          {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button><button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#080d1a]"><Bot className="h-4 w-4 text-cyan-300" /></button></div> : null}
+          {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{activeConversation?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1>{activeConversation ? <button onClick={() => void handleTogglePinConversation(activeConversation)} className={cn("ml-3 transition hover:text-cyan-200", activeConversation.pinned ? "text-cyan-300" : "text-white/55")} title={activeConversation.pinned ? "Unpin chat" : "Pin chat"} aria-label={activeConversation.pinned ? "Unpin chat" : "Pin chat"}><Star className={cn("h-4 w-4", activeConversation.pinned && "fill-current")} /></button> : null}</header> : null}
+          {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button></div> : null}
           <div
             ref={chatScrollRef}
             onScroll={captureScrollPosition}
@@ -1059,15 +1068,12 @@ export function ChatPage() {
                   <input ref={chatComposerRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && handleSend()} placeholder="Ask anything or give a command..." className="min-h-14 w-full bg-transparent text-base text-white outline-none placeholder:text-white/50" />
                   <div className="mt-auto flex items-center gap-3">
                     <button onClick={() => chatFileInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/70"><Plus className="h-5 w-5" /></button>
-                    <button className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-4 text-sm text-white/80"><Globe2 className="h-4 w-4" />Web search<ChevronDown className="h-4 w-4" /></button>
-                    <button className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-4 text-sm text-white/80"><Brain className="h-4 w-4" />Think<ChevronDown className="h-4 w-4" /></button>
-                    <button className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/80"><Mic className="h-5 w-5" /></button>
-                    <button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-[0_0_28px_rgba(0,174,255,.35)] disabled:opacity-45"><Send className="h-5 w-5" /></button>
+                    <button onClick={() => void handleSend()} disabled={!input.trim()} className="ml-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-[0_0_28px_rgba(0,174,255,.35)] disabled:opacity-45"><Send className="h-5 w-5" /></button>
                   </div>
                 </div>
 
                 <div className="mx-auto mt-6 grid w-full max-w-[980px] grid-cols-2 gap-3 lg:grid-cols-5">{launchActions.map(({ title, subtitle, icon: Icon, color, prompt }) => <button key={title} onClick={() => setInput(prompt)} className="rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/30"><span className={cn("mb-4 flex h-9 w-9 items-center justify-center rounded-lg", color)}><Icon className="h-5 w-5" /></span><p className="text-sm font-medium text-white">{title}</p><p className="mt-1 text-xs text-white/45">{subtitle}</p></button>)}</div>
-                <div className="mx-auto mt-9 w-full max-w-[980px]"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-medium text-white">Your Agents</h2><button className="rounded-full border border-white/10 px-4 py-2 text-xs text-cyan-200">View all</button></div><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div></div>
+                <div className="mx-auto mt-9 w-full max-w-[980px]"><h2 className="mb-3 text-lg font-medium text-white">Your Agents</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div></div>
                 <p className="mt-8 text-center text-xs text-white/38">CEASER can make mistakes. Verify important information.</p>
               </>
             ) : (
@@ -1123,7 +1129,7 @@ export function ChatPage() {
                 disabled={isLoading}
                 className="h-10 min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/45 disabled:opacity-50"
               />
-              <div className="mt-auto flex items-center gap-3"><button onClick={() => chatFileInputRef.current?.click()} disabled={isUploadingFile} className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]">{isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button><button className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]"><Globe2 className="h-4 w-4" /></button>{isLoading ? <button onClick={cancelActiveStream} className="ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white"><Square className="h-4 w-4 fill-current" /></button> : <><button className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/75"><Sparkles className="h-4 w-4" /></button><button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-white shadow-[0_0_24px_rgba(124,58,237,.38)] disabled:opacity-45"><Send className="h-4 w-4" /></button></>}</div>
+              <div className="mt-auto flex items-center gap-3"><button onClick={() => chatFileInputRef.current?.click()} disabled={isUploadingFile} className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]">{isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>{isLoading ? <button onClick={cancelActiveStream} className="ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white"><Square className="h-4 w-4 fill-current" /></button> : <button onClick={() => void handleSend()} disabled={!input.trim()} className="ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-white shadow-[0_0_24px_rgba(124,58,237,.38)] disabled:opacity-45"><Send className="h-4 w-4" /></button>}</div>
             </div>
             <p className="mt-2 text-center text-[11px] text-white/35">CEASER can make mistakes. Please verify important information.</p>
           </div>

@@ -906,7 +906,7 @@ export function ChatPage() {
         )}
       >
         <div className="flex h-20 items-center justify-between border-b border-white/[0.07] px-5">
-          {!chatSidebarCollapsed && <div className="flex items-center gap-3"><CeaserLogo className="h-9 w-9" /><p className="text-lg font-semibold tracking-[0.08em] text-white">CEASER</p></div>}
+          {!chatSidebarCollapsed && <div className="flex items-center gap-3"><CeaserLogo showText={false} className="h-9 w-9" /><p className="text-lg font-semibold tracking-[0.08em] text-white">CEASER</p></div>}
           <button
             onClick={() => setChatSidebarCollapsed((value) => !value)}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary/45 text-muted-foreground transition hover:bg-secondary hover:text-foreground"

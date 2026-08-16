@@ -12,7 +12,7 @@ import { CeaserLogo } from "../ceaser-logo"
 import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, BarChart3, Bookmark, Bot, Brain, CalendarPlus, Check, CheckCircle2, ChevronDown, ChevronLeft, Code2, Copy, Edit3, FileText, Globe2, Lightbulb, Loader2, Mail, MessageSquare, Mic, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RotateCcw, Search, Send, Share2, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, BarChart3, Bookmark, Bot, Brain, CalendarPlus, Check, CheckCircle2, ChevronDown, ChevronLeft, Code2, Copy, Edit3, FileText, Globe2, Lightbulb, Loader2, Mail, MessageSquare, Mic, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, SlidersHorizontal, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -1009,6 +1009,7 @@ export function ChatPage() {
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="relative flex min-h-0 w-full flex-1 flex-col px-8 pb-5 lg:px-16">
+          {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{conversations.find((item) => item.id === activeConversationId)?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1><button className="ml-3 text-white/55" title="Favorite conversation"><Star className="h-4 w-4" /></button><div className="ml-auto flex items-center gap-3"><button className="flex h-10 w-10 items-center justify-center rounded-full text-white/55 hover:bg-white/[0.06]"><SlidersHorizontal className="h-4 w-4" /></button><button className="flex h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-sm text-white/80"><Share2 className="h-4 w-4" />Share</button><button className="flex h-10 w-10 items-center justify-center rounded-full text-white/60"><MoreHorizontal className="h-5 w-5" /></button></div></header> : null}
           {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button><button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#080d1a]"><Bot className="h-4 w-4 text-cyan-300" /></button></div> : null}
           <div
             ref={chatScrollRef}
@@ -1080,7 +1081,7 @@ export function ChatPage() {
               </div>
             ) : null}
 
-            <div className="ceaser-composer mx-auto flex min-h-[68px] w-full max-w-[1180px] items-center gap-3 rounded-lg px-4 backdrop-blur-2xl">
+            <div className="ceaser-conversation-composer mx-auto flex min-h-[96px] w-full max-w-[980px] flex-col rounded-[20px] px-5 py-4 backdrop-blur-2xl">
               <input
                 ref={chatFileInputRef}
                 type="file"
@@ -1088,13 +1089,6 @@ export function ChatPage() {
                 accept=".pdf,.docx,.pptx,.xlsx,.txt,.png,.jpg,.jpeg"
                 onChange={(event) => void handleChatFileUpload(event)}
               />
-              <button
-                onClick={() => chatFileInputRef.current?.click()}
-                disabled={isUploadingFile}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-              >
-                {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-              </button>
               <input
                 ref={chatComposerRef}
                 type="text"
@@ -1103,14 +1097,11 @@ export function ChatPage() {
                 onKeyDown={(event) => event.key === "Enter" && handleSend()}
                 placeholder="Ask anything or give a command..."
                 disabled={isLoading}
-                className="h-12 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/45 disabled:opacity-50"
+                className="h-10 min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/45 disabled:opacity-50"
               />
-              {isLoading ? (
-                <button onClick={cancelActiveStream} aria-label="Stop response" title="Stop response" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_28px_rgba(244,63,94,0.26)] transition hover:bg-rose-400"><Square className="h-4 w-4 fill-current" /></button>
-              ) : (
-                <button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_28px_rgba(16,185,129,0.26)] transition hover:bg-emerald-400 disabled:opacity-50"><Send className="h-4 w-4" /></button>
-              )}
+              <div className="mt-auto flex items-center gap-3"><button onClick={() => chatFileInputRef.current?.click()} disabled={isUploadingFile} className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]">{isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button><button className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]"><Globe2 className="h-4 w-4" /></button>{isLoading ? <button onClick={cancelActiveStream} className="ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white"><Square className="h-4 w-4 fill-current" /></button> : <><button className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/75"><Sparkles className="h-4 w-4" /></button><button onClick={() => void handleSend()} disabled={!input.trim()} className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-white shadow-[0_0_24px_rgba(124,58,237,.38)] disabled:opacity-45"><Send className="h-4 w-4" /></button></>}</div>
             </div>
+            <p className="mt-2 text-center text-[11px] text-white/35">CEASER can make mistakes. Please verify important information.</p>
           </div>
         </section>
       </main>
@@ -1281,17 +1272,12 @@ function ChatBubble({
   onPromptSelect: (prompt: string) => void
   onEdit: (message: Message) => void
 }) {
+  const isUser = message.role === "user"
   return (
-    <div className={cn("flex w-full gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
-      {message.role === "assistant" && (
-        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-200">
-          C
-        </div>
-      )}
-      <div className={cn(message.role === "user" ? "max-w-[78%] text-right text-white" : "min-w-0 flex-1 text-white")}>
-        <div className={cn("mb-2 flex items-center gap-2 text-xs", message.role === "user" ? "justify-end text-white/42" : "text-white/48")}>
-          <span>{message.role === "user" ? "You" : "Ceaser"}</span>
-        </div>
+    <div className={cn("flex w-full gap-4", isUser ? "justify-end" : "justify-start")}>
+      {!isUser && <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-500/45 bg-violet-500/10 text-violet-300 shadow-[0_0_24px_rgba(139,92,246,.14)]"><Sparkles className="h-5 w-5" /></div>}
+      <div className={cn(isUser ? "max-w-[68%] text-white" : "min-w-0 flex-1 text-white")}>
+        {!isUser && <div className="mb-3 flex items-center gap-3"><span className="font-semibold text-violet-400">CEASER</span><span className="text-xs text-white/40">{message.timestamp}</span>{!message.isTyping && !message.isStreaming ? <span className="ml-auto inline-flex items-center gap-2 rounded-full bg-emerald-500/[0.07] px-4 py-2 text-xs text-emerald-400"><Check className="h-3.5 w-3.5" />Completed</span> : null}</div>}
         {message.isTyping ? (
           <div className="flex items-center gap-2 text-white/55">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -1299,6 +1285,8 @@ function ChatBubble({
           </div>
         ) : (
           <>
+          <div className={cn(isUser ? "rounded-2xl border border-violet-500/45 bg-gradient-to-br from-violet-500/[0.16] to-purple-900/[0.16] px-5 py-4 shadow-[0_14px_45px_rgba(76,29,149,.12)]" : "rounded-2xl border border-white/[0.12] bg-[#080d1b]/76 p-5 shadow-[0_20px_60px_rgba(0,0,0,.2)]")}>
+            {isUser && <div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-violet-300">You</span><span className="text-white/45">{message.timestamp}</span></div>}
             {message.role === "assistant" && !message.isStreaming && message.richResponse
               ? <RichResponseRenderer response={message.richResponse} onAction={onPromptSelect} />
               : message.role === "assistant" && message.isStreaming && message.content.trimStart().startsWith("{")
@@ -1323,15 +1311,15 @@ function ChatBubble({
                 Edit
               </button>
             )}
-            {message.role === "assistant" && !message.isStreaming && (
+          </div>
+          {message.role === "assistant" && !message.isStreaming && (
               <ResponseActions message={message} previousUserPrompt={previousUserPrompt} onPromptSelect={onPromptSelect} />
-            )}
-            <p className={cn("mt-2 text-xs", message.role === "user" ? "text-white/60" : "text-white/38")}>{message.timestamp}</p>
+          )}
           </>
         )}
       </div>
-      {message.role === "user" && (
-        <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#0b3f4a] text-xs font-semibold text-cyan-100">
+      {isUser && (
+        <div className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-700 text-xs font-semibold text-white">
           A
         </div>
       )}
@@ -1533,7 +1521,7 @@ function ResponseActions({
               key={action.id}
               onClick={() => void action.run()}
               className={cn(
-                "inline-flex h-8 items-center gap-2 rounded-full bg-white/[0.045] px-3 text-xs text-white/58 transition hover:bg-white/[0.08] hover:text-white",
+                "inline-flex h-9 items-center gap-2 rounded-lg border border-white/[0.09] bg-transparent px-3 text-xs text-white/58 transition hover:bg-white/[0.06] hover:text-white",
                 active && "bg-cyan-400/12 text-cyan-200",
               )}
             >

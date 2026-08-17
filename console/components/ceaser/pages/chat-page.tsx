@@ -1662,21 +1662,8 @@ function MarkdownMessage({ content, isUser, isStreaming }: { content: string; is
   if (isStreaming && !content.trim()) {
     return <div className="flex items-center gap-2 text-sm text-white/60"><Loader2 className="h-4 w-4 animate-spin" /> Writing response…</div>
   }
-  // During streaming, render the raw partial text immediately. Waiting for a
-  // newline makes normal one-line answers appear frozen until completion.
-  // Once the stream finishes, this component re-renders the same content with
-  // the richer Markdown layout below.
-  if (isStreaming) {
-    return (
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">
-        {content}
-        <span aria-label="CEASER is typing" className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-cyan-300 align-[-2px]" />
-      </p>
-    )
-  }
-
   const visibleContent = content.replace(/\s*\(\s*\[?[-\w.]+\.(?:com|org|net|gov|edu|in)\]?\s*\)/gi, "")
-  const structured = parseAnswerSections(visibleContent)
+  const structured = isStreaming ? null : parseAnswerSections(visibleContent)
   if (structured) return <StructuredAnswer data={structured} />
 
   const lines = visibleContent.split("\n")
@@ -1696,6 +1683,19 @@ function MarkdownMessage({ content, isUser, isStreaming }: { content: string; is
   }
 
   for (let index = 0; index < lines.length; index += 1) {
+    const fence = lines[index].match(/^\s*```([^\s`]*)\s*$/)
+    if (fence) {
+      flushBullets()
+      const codeLines: string[] = []
+      let endIndex = index + 1
+      while (endIndex < lines.length && !/^\s*```\s*$/.test(lines[endIndex])) {
+        codeLines.push(lines[endIndex])
+        endIndex += 1
+      }
+      elements.push(<MarkdownCodeBlock key={`code-${index}`} language={fence[1] || "code"} content={codeLines.join("\n")} streaming={Boolean(isStreaming && endIndex >= lines.length)} />)
+      index = endIndex < lines.length ? endIndex : lines.length
+      continue
+    }
     const table = readMarkdownTable(lines, index)
     if (table) {
       flushBullets()
@@ -1733,7 +1733,44 @@ function MarkdownMessage({ content, isUser, isStreaming }: { content: string; is
   }
   flushBullets()
 
-  return <div className="space-y-1">{elements}</div>
+  return <div className="space-y-1">{elements}{isStreaming ? <span aria-label="CEASER is typing" className="ml-1 inline-block h-4 w-1 animate-pulse bg-cyan-300 align-[-2px]" /> : null}</div>
+}
+
+function MarkdownCodeBlock({ language, content, streaming }: { language: string; content: string; streaming: boolean }) {
+  const [copied, setCopied] = useState(false)
+  const label = language.trim().toUpperCase() || "CODE"
+  const copyCode = async () => {
+    await navigator.clipboard.writeText(content)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }
+  return (
+    <section className="my-4 overflow-hidden rounded-md border border-white/15 bg-[#070a0d] shadow-[0_16px_40px_rgba(0,0,0,0.28)]">
+      <header className="flex h-10 items-center justify-between border-b border-white/10 bg-white/[0.035] px-3">
+        <span className="rounded border border-white/15 bg-white/[0.07] px-2 py-1 font-mono text-[11px] font-semibold text-white/88">{label}</span>
+        <button type="button" onClick={() => void copyCode()} className="flex items-center gap-1.5 text-xs font-medium text-white/72 transition hover:text-cyan-300" aria-label="Copy code">
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy"}
+        </button>
+      </header>
+      <pre className="max-h-[32rem] overflow-auto p-4 font-mono text-[13px] leading-6 text-slate-200"><code>{highlightCode(content, language)}</code>{streaming ? <span className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-cyan-300 align-[-2px]" /> : null}</pre>
+    </section>
+  )
+}
+
+function highlightCode(content: string, language: string): ReactNode[] {
+  const htmlLike = /^(html|xml|svg|jsx|tsx)$/i.test(language)
+  const pattern = htmlLike
+    ? /(<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g
+    : /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:const|let|var|function|return|if|else|for|while|class|def|import|from|export|async|await|new|try|catch|throw|true|false|null|None|True|False)\b|\b\d+(?:\.\d+)?\b)/g
+  return content.split(pattern).filter(Boolean).map((token, index) => {
+    let color = "text-slate-200"
+    if (/^(<!--|\/\*|\/\/|#)/.test(token)) color = "text-slate-500"
+    else if (/^<\/?[A-Za-z]/.test(token)) color = "text-pink-400"
+    else if (/^["'`]/.test(token)) color = "text-lime-300"
+    else if (/^(const|let|var|function|return|if|else|for|while|class|def|import|from|export|async|await|new|try|catch|throw|true|false|null|None|True|False)$/.test(token)) color = "text-cyan-300"
+    else if (/^\d/.test(token)) color = "text-amber-300"
+    return <span key={`${index}-${token.slice(0, 12)}`} className={color}>{token}</span>
+  })
 }
 
 function readMarkdownTable(lines: string[], startIndex: number) {

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { CeaserLogo } from "../ceaser-logo"
 import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
+import { navigationItems } from "@/lib/ceaser"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
 import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Edit3, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -229,9 +230,16 @@ const richMessageFields = (message: ChatMessage): Partial<Message> => {
   }
 }
 
+function greetingForHour(hour: number) {
+  if (hour < 12) return "Good morning"
+  if (hour < 17) return "Good afternoon"
+  return "Good evening"
+}
+
 export function ChatPage() {
   const { setCurrentPage, confirmDialog, promptDialog, pendingChatRequest, clearPendingChatRequest } = useApp()
   const [displayName, setDisplayName] = useState("there")
+  const [timeGreeting, setTimeGreeting] = useState(() => greetingForHour(new Date().getHours()))
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -264,6 +272,13 @@ export function ChatPage() {
   const autoSendSeedRef = useRef(false)
   const processedChatRequestRef = useRef<string | null>(null)
   const isProgrammaticScrollRef = useRef(false)
+
+  useEffect(() => {
+    const refreshGreeting = () => setTimeGreeting(greetingForHour(new Date().getHours()))
+    refreshGreeting()
+    const timer = window.setInterval(refreshGreeting, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const captureScrollPosition = useCallback(() => {
     const container = chatScrollRef.current
@@ -902,25 +917,25 @@ export function ChatPage() {
       <aside
         className={cn(
           "relative z-20 flex h-full shrink-0 flex-col border-r border-border bg-card/72 backdrop-blur-xl transition-all duration-300",
-          chatSidebarCollapsed ? "w-[76px]" : "w-[344px]",
+          chatSidebarCollapsed ? "w-[68px]" : "w-[272px]",
         )}
       >
-        <div className="flex h-20 items-center justify-between border-b border-white/[0.07] px-5">
-          {!chatSidebarCollapsed && <div className="flex items-center gap-3"><CeaserLogo showText={false} className="h-9 w-9" /><p className="text-lg font-semibold tracking-[0.08em] text-white">CEASER</p></div>}
+        <div className="flex h-16 items-center justify-between border-b border-white/[0.07] px-4">
+          {!chatSidebarCollapsed && <div className="flex items-center gap-2.5"><CeaserLogo showText={false} className="h-8 w-8" /><p className="text-[15px] font-semibold tracking-[0.08em] text-white">CEASER</p></div>}
           <button
             onClick={() => setChatSidebarCollapsed((value) => !value)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary/45 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary/45 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
             aria-label={chatSidebarCollapsed ? "Expand chat sidebar" : "Collapse chat sidebar"}
           >
             <ChevronLeft className={cn("h-4 w-4 transition-transform", chatSidebarCollapsed && "rotate-180")} />
           </button>
         </div>
 
-        <div className="px-3">
+        <div className="mt-3 px-3">
           <button
             onClick={() => void handleNewChat()}
             className={cn(
-              "ceaser-primary-action flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white transition",
+              "ceaser-primary-action flex h-10 w-full items-center justify-center gap-2 rounded-lg text-xs font-semibold text-white transition",
               chatSidebarCollapsed && "rounded-full px-0",
             )}
           >
@@ -929,21 +944,46 @@ export function ChatPage() {
           </button>
         </div>
 
+        <nav className={cn("mt-3 border-y border-white/[0.06] py-2", chatSidebarCollapsed ? "px-2" : "px-3")} aria-label="CEASER navigation">
+          <div className="space-y-0.5">
+            {navigationItems.map((item) => {
+              const Icon = item.icon
+              const active = item.id === "chat"
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCurrentPage(item.id)}
+                  title={item.label}
+                  className={cn(
+                    "flex h-8 w-full items-center rounded-md text-xs transition",
+                    chatSidebarCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
+                    active ? "bg-white/[0.07] text-white" : "text-white/58 hover:bg-white/[0.045] hover:text-white",
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5 shrink-0", active && "text-cyan-300")} />
+                  {!chatSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              )
+            })}
+          </div>
+        </nav>
+
         {!chatSidebarCollapsed && (
           <>
-            <div className="mt-4 px-3">
-              <div className="flex h-10 items-center gap-2 rounded-2xl border border-border bg-secondary/35 px-3">
-                <Search className="h-4 w-4 text-muted-foreground" />
+            <div className="mt-3 px-3">
+              <div className="flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/35 px-3">
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search chats..."
-                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-4 gap-1 px-3">
+            <div className="mt-2 grid grid-cols-4 gap-0.5 px-3">
               {([["all", "All"], ["pinned", "Pinned"], ["today", "Today"], ["week", "This Week"]] as const).map(([value, label]) => (
                 <button
                   key={value}
@@ -952,7 +992,7 @@ export function ChatPage() {
                     setShowArchivedChats(false)
                     setConversationFilter(value)
                   }}
-                  className={cn("rounded-xl px-2 py-2 text-xs font-medium transition", conversationFilter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
+                  className={cn("rounded-md px-1 py-1.5 text-[10px] font-medium transition", conversationFilter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground")}
                 >
                   {label}
                 </button>
@@ -961,7 +1001,7 @@ export function ChatPage() {
           </>
         )}
 
-        <div className={cn("mt-4 flex-1 overflow-y-auto", chatSidebarCollapsed ? "px-2" : "px-3")}>
+        <div className={cn("mt-3 flex-1 overflow-y-auto", chatSidebarCollapsed ? "px-2" : "px-3")}>
           {chatSidebarCollapsed ? (
             <div className="space-y-2">
               {(showSavedResponses ? filteredSavedResponses : filteredConversations).slice(0, 8).map((item) => (
@@ -985,14 +1025,14 @@ export function ChatPage() {
                   key={response.id}
                   onClick={() => handleSelectSavedResponse(response)}
                   className={cn(
-                    "w-full rounded-2xl border px-3 py-3 text-left transition",
+                    "w-full rounded-lg border px-2.5 py-2 text-left transition",
                     messages.length === 1 && messages[0]?.id === response.id
                       ? "border-primary bg-primary/12 text-foreground shadow-[0_12px_32px_rgba(79,140,255,0.14)]"
                       : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary/45 hover:text-foreground",
                   )}
                 >
-                  <p className="truncate text-sm font-semibold">{response.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{formatTime(response.createdAt)}</p>
+                  <p className="truncate text-xs font-semibold">{response.title}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">{formatTime(response.createdAt)}</p>
                 </button>
               ))}
               {!filteredSavedResponses.length && <p className="px-3 py-8 text-center text-sm text-muted-foreground">No saved responses yet.</p>}
@@ -1004,15 +1044,15 @@ export function ChatPage() {
                   <button
                     onClick={() => void handleSelectConversation(conversation.id)}
                     className={cn(
-                      "w-full rounded-2xl border px-3 py-3 text-left transition",
+                      "w-full rounded-lg border px-2.5 py-2 text-left transition",
                       activeConversationId === conversation.id ? "border-primary bg-primary/12 text-foreground shadow-[0_12px_32px_rgba(79,140,255,0.14)]" : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary/45 hover:text-foreground",
                     )}
                   >
                     <div className="flex items-start gap-2">
                       {conversation.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 text-cyan-300" />}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{conversation.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatTime(conversation.created_at)}</p>
+                        <p className="truncate text-xs font-medium">{conversation.title}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{formatTime(conversation.created_at)}</p>
                       </div>
                     </div>
                   </button>
@@ -1058,7 +1098,7 @@ export function ChatPage() {
             )}
             {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
-                <div className="mx-auto mb-6 flex w-fit rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-sm text-white/80">Good afternoon, {displayName} 👋</div>
+                <div className="mx-auto mb-6 flex w-fit rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-sm text-white/80">{timeGreeting}, {displayName} 👋</div>
                 <h1 className="text-center text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
                   How can <span className="ceaser-gradient-text">I help you today?</span>
                 </h1>

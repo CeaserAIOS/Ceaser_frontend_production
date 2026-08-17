@@ -54,7 +54,7 @@ export function Sidebar() {
       onMouseLeave={collapseSidebar}
       className={cn(
         "spatial-panel flex h-[calc(100vh-1rem)] transform-gpu flex-col rounded-lg will-change-[width] transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
-        chatNavigation ? "w-24" : sidebarCollapsed ? "w-16" : "w-56"
+        chatNavigation ? "w-28" : sidebarCollapsed ? "w-[4.5rem]" : "w-56"
       )}
     >
       {/* Logo */}
@@ -96,14 +96,14 @@ export function Sidebar() {
                 key={item.id}
                 onClick={() => setCurrentPage(item.id)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-[background-color,color,padding] duration-150",
+                  "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-[15px] font-medium transition-[background-color,color,padding] duration-150",
                   isActive 
                     ? "spatial-active-glow bg-primary/15 text-primary" 
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                  (sidebarCollapsed || chatNavigation) && "flex-col justify-center gap-1 px-0 py-3 text-[11px]"
+                  (sidebarCollapsed || chatNavigation) && "min-h-[3.75rem] flex-col justify-center gap-1.5 px-1 py-3 text-xs"
                 )}
               >
-                <Icon className="h-4 w-4 flex-shrink-0" />
+                <Icon className="h-5 w-5 flex-shrink-0" strokeWidth={1.8} />
                 {(!sidebarCollapsed || chatNavigation) && <span>{item.label}</span>}
               </button>
             )

@@ -1,12 +1,12 @@
 /**
  * CEASER launch configuration.
- * Build can inject NEXT_PUBLIC_CEASER_LAUNCHED through __CEASER_LAUNCHED__.
- * If not injected, the launch date automatically activates public actions.
+ * The launch date is authoritative so a stale deployment flag cannot expose
+ * the post-launch experience before the announced time.
  */
 (function () {
   var injected = "__CEASER_LAUNCHED__";
-  var launchDate = "2026-08-17T12:00:00+05:30";
-  var launchedByEnv = injected === "true";
+  var launchDate = "2026-08-21T12:00:00+05:30";
+  var launchedByEnv = injected === "true" && Date.now() >= new Date(launchDate).getTime();
   var launchedByDate = Date.now() >= new Date(launchDate).getTime();
 
   window.CEASER_CONFIG = {

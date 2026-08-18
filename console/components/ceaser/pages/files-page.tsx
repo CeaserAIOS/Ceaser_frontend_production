@@ -139,11 +139,6 @@ export function FilesPage() {
       setPreviewUrl(null)
       setPreviewError(false)
       if (!selectedFile || !canPreview) return
-      const storagePath = selectedFile.storage_path || ""
-      if (storagePath && !storagePath.startsWith("local://") && !storagePath.startsWith("supabase://")) {
-        setPreviewError(true)
-        return
-      }
       try {
         const token = getAccessToken()
         const response = await fetch(`${API_BASE_URL}/files/${selectedFile.id}/preview`, {
@@ -392,6 +387,7 @@ export function FilesPage() {
 
 function DocumentPreview({ file, previewUrl, previewError, previewPage, zoomLevel }: { file: FileContentRecord; previewUrl: string | null; previewError: boolean; previewPage: number; zoomLevel: number }) {
   const type = file.file_type.toLowerCase()
+  const content = formatDocumentPreview(file.extracted_content)
   return (
     <section className="min-h-0 overflow-y-auto bg-[#050B18]/60 p-6">
       <div className="relative mx-auto min-h-full rounded-xl border border-border bg-white p-6 text-slate-950 shadow-[0_24px_80px_rgba(0,0,0,0.32)]" style={{ width: `${zoomLevel}%`, maxWidth: "72rem" }}>
@@ -403,10 +399,14 @@ function DocumentPreview({ file, previewUrl, previewError, previewPage, zoomLeve
         ) : (
           <article className="prose prose-slate max-w-none">
             <h1>{file.name.replace(/\.[^.]+$/, "")}</h1>
-            {previewError && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The original file is not available in this local workspace, so CEASER is showing extracted content. Re-upload it to restore live preview.</p>}
-            {file.extracted_content ? (
-              file.extracted_content.split(/\n{2,}/).slice(0, 18).map((paragraph, index) => (
-                <p key={index}>{paragraph.trim()}</p>
+            {previewError && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{file.extraction_metadata?.generated ? "CEASER restored this generated document from its saved content." : "The original uploaded file is unavailable, so CEASER is showing its saved text. Upload the original again to restore the visual preview."}</p>}
+            {content.length ? (
+              content.slice(0, 36).map((block, index) => block.kind === "heading" ? (
+                <h2 key={index}>{block.text}</h2>
+              ) : block.kind === "list" ? (
+                <ul key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ul>
+              ) : (
+                <p key={index}>{block.text}</p>
               ))
             ) : (
               <p>No readable text has been extracted from this file yet.</p>
@@ -416,6 +416,59 @@ function DocumentPreview({ file, previewUrl, previewError, previewPage, zoomLeve
       </div>
     </section>
   )
+}
+
+type PreviewBlock = { kind: "heading"; text: string } | { kind: "paragraph"; text: string } | { kind: "list"; items: string[] }
+
+function formatDocumentPreview(raw: string): PreviewBlock[] {
+  if (!raw.trim()) return []
+  let content = raw.trim()
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    if (parsed.type === "project_report") {
+      const labels: Record<string, string> = {
+        executive_summary: "Executive Summary", objective: "Objective", context: "Context",
+        key_requirements: "Key Requirements", scope: "Scope", proposed_solution: "Proposed Solution",
+        system_workflow: "System / Workflow", components: "Components / Resources",
+        implementation: "Implementation Plan", tasks: "Task Breakdown", timeline: "Timeline",
+        testing: "Testing & Validation", risks: "Risks & Constraints", expected_outcome: "Expected Outcome",
+        next_steps: "Next Steps",
+      }
+      const blocks: PreviewBlock[] = []
+      for (const [key, label] of Object.entries(labels)) {
+        const value = parsed[key]
+        if (value == null || value === "") continue
+        blocks.push({ kind: "heading", text: label })
+        blocks.push(...structuredPreviewBlocks(value))
+      }
+      return blocks
+    }
+  } catch {
+    // Existing plain-text and Markdown documents continue through the parser below.
+  }
+  return content.split(/\n{2,}/).flatMap((part): PreviewBlock[] => {
+    const lines = part.split("\n").map((line) => line.trim()).filter(Boolean)
+    if (!lines.length) return []
+    if (lines.every((line) => /^[-*]\s+/.test(line))) return [{ kind: "list", items: lines.map((line) => line.replace(/^[-*]\s+/, "")) }]
+    if (lines.length === 1 && lines[0].length < 90 && !/[.!?]$/.test(lines[0])) return [{ kind: "heading", text: lines[0].replace(/^#+\s*/, "") }]
+    return [{ kind: "paragraph", text: lines.join(" ").replace(/\*\*/g, "") }]
+  })
+}
+
+function structuredPreviewBlocks(value: unknown): PreviewBlock[] {
+  if (Array.isArray(value)) return [{ kind: "list", items: value.map((item) => typeof item === "string" ? item : readableStructuredValue(item)) }]
+  if (value && typeof value === "object") return [{ kind: "list", items: Object.entries(value as Record<string, unknown>).map(([key, item]) => `${humanizeKey(key)}: ${readableStructuredValue(item)}`) }]
+  return [{ kind: "paragraph", text: String(value) }]
+}
+
+function readableStructuredValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(readableStructuredValue).join("; ")
+  if (value && typeof value === "object") return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${humanizeKey(key)}: ${readableStructuredValue(item)}`).join("; ")
+  return String(value ?? "")
+}
+
+function humanizeKey(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
 function SmartFilter({ icon, label, active = false, onClick }: { icon: ReactNode; label: string; active?: boolean; onClick: () => void }) {

@@ -9,6 +9,7 @@ import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
+import { creditsApi, type CreditOverview, type CreditProduct } from "@/lib/api/credits"
 import { AgentAvatar } from "../agent-avatar"
 import {
   BookOpen,
@@ -28,7 +29,11 @@ import {
   ShieldCheck,
   SquareCheckBig,
   X,
+  Coins,
+  Copy,
 } from "lucide-react"
+
+declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open: () => void; on: (event: string, callback: (response: unknown) => void) => void } } }
 
 type AnyRecord = Record<string, unknown>
 type IntegrationWithProvider = IntegrationRecord & { provider?: string }
@@ -331,6 +336,10 @@ export function MissionControl() {
   const [isLoading, setIsLoading] = useState(true)
   const [isIntegrationRefreshing, setIsIntegrationRefreshing] = useState(true)
   const [detailModal, setDetailModal] = useState<DetailModal>(null)
+  const [creditOverview, setCreditOverview] = useState<CreditOverview | null>(null)
+  const [creditProducts, setCreditProducts] = useState<CreditProduct[]>([])
+  const [creditsOpen, setCreditsOpen] = useState(false)
+  const [creditBusy, setCreditBusy] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -384,6 +393,28 @@ export function MissionControl() {
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    void Promise.all([creditsApi.overview(), creditsApi.products()]).then(([wallet, products]) => {
+      setCreditOverview(wallet); setCreditProducts(products)
+    }).catch(() => undefined)
+  }, [])
+
+  const buyCredits = async (product: CreditProduct) => {
+    setCreditBusy(true)
+    try {
+      if (!window.Razorpay) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script"); script.src = "https://checkout.razorpay.com/v1/checkout.js"
+          script.onload = () => resolve(); script.onerror = () => reject(new Error("Checkout unavailable")); document.head.appendChild(script)
+        })
+      }
+      const order = await creditsApi.createOrder(product.id)
+      const Checkout = window.Razorpay
+      if (!Checkout) throw new Error("Checkout unavailable")
+      new Checkout({ key: order.key_id, order_id: order.order_id, amount: order.amount, currency: order.currency, name: "CEASER Credits", description: `${order.credits} credits`, handler: async (result: Record<string, string>) => { await creditsApi.verify(order.order_id, result.razorpay_payment_id, result.razorpay_signature); setCreditOverview(await creditsApi.overview()); setCreditBusy(false) }, modal: { ondismiss: () => setCreditBusy(false) } }).open()
+    } catch { setCreditBusy(false) }
+  }
 
   const profile = readUserProfile()
   const displayName = getUserDisplayName(profile)
@@ -658,6 +689,11 @@ export function MissionControl() {
         </main>
 
         <aside className="space-y-4">
+          <button onClick={() => setCreditsOpen(true)} className="flex w-full items-center gap-3 rounded-2xl border border-cyan-300/15 bg-[#071728] p-4 text-left transition hover:border-cyan-300/40">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-400/10 text-cyan-300"><Coins className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-lg font-semibold text-white">{creditOverview?.total_available?.toLocaleString() ?? "--"} Credits</span><span className="block text-xs text-slate-400">{creditOverview?.monthly_allowance?.toLocaleString() ?? "--"} monthly</span></span>
+            <ChevronRight className="h-4 w-4 text-slate-500" />
+          </button>
           <Panel title="Memory Insights" action={<ViewAllButton page="memory" />}>
             <div className="space-y-1 p-4">
               {isLoading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-500" />}
@@ -713,6 +749,17 @@ export function MissionControl() {
           </Panel>
         </aside>
       </div>
+      {creditsOpen && creditOverview && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/70 p-4" onMouseDown={(event) => event.target === event.currentTarget && setCreditsOpen(false)}>
+          <section className="max-h-[82vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-cyan-300/15 bg-[#071321] p-6 shadow-2xl">
+            <div className="flex items-start justify-between"><div><h2 className="text-xl font-semibold text-white">CEASER Credits</h2><p className="mt-1 text-sm text-slate-400">{creditOverview.total_available.toLocaleString()} available · renews {new Date(creditOverview.renewal_date).toLocaleDateString()}</p></div><button onClick={() => setCreditsOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-white/5"><X className="h-5 w-5" /></button></div>
+            <div className="mt-5 grid grid-cols-3 gap-3">{[["Monthly", creditOverview.monthly], ["Bonus", creditOverview.bonus], ["Purchased", creditOverview.purchased]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-white/5 bg-white/[.03] p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-lg font-semibold text-white">{Number(value).toLocaleString()}</p></div>)}</div>
+            <div className="mt-6"><h3 className="font-semibold text-white">Buy Credits</h3><div className="mt-3 grid gap-3 sm:grid-cols-3">{creditProducts.map((product) => <button disabled={creditBusy} onClick={() => void buyCredits(product)} key={product.id} className="rounded-xl border border-purple-300/15 bg-purple-400/5 p-4 text-left hover:border-purple-300/40"><span className="block font-semibold text-white">{product.name}</span><span className="mt-1 block text-sm text-purple-200">{product.credits.toLocaleString()} credits</span><span className="mt-3 block text-sm text-slate-400">₹{product.amount_inr}</span></button>)}</div></div>
+            <div className="mt-6 rounded-xl border border-emerald-300/15 bg-emerald-400/5 p-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold text-white">Refer & Earn</h3><p className="mt-1 text-xs text-slate-400">{creditOverview.referral.successful} successful · {creditOverview.referral.credits_earned} credits earned</p></div><button onClick={() => void navigator.clipboard.writeText(creditOverview.referral.link)} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white"><Copy className="h-4 w-4" /> Copy Link</button></div></div>
+            <div className="mt-6"><h3 className="font-semibold text-white">Recent Usage</h3><div className="mt-2 divide-y divide-white/5">{creditOverview.history.slice(0, 8).map(item => <div key={item.id} className="flex items-center justify-between py-3 text-sm"><span className="text-slate-300">{item.source.replaceAll("_", " ")}</span><span className={item.amount >= 0 ? "text-emerald-400" : "text-slate-300"}>{item.amount > 0 ? "+" : ""}{item.amount}</span></div>)}</div></div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

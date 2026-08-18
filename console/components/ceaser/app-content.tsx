@@ -5,7 +5,6 @@ import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
 import { MissionControl } from "./pages/mission-control"
 import { ChatPage } from "./pages/chat-page"
 import { StudentPage } from "./pages/student-page"
-import { AgentsPage } from "./pages/agents-page"
 import { MemoryPage } from "./pages/memory-page"
 import { ProjectsPage } from "./pages/projects-page"
 import { GoalsPage } from "./pages/goals-page"
@@ -29,7 +28,7 @@ export function AppContent() {
     case "student":
       return <StudentPage />
     case "agents":
-      return <AgentsPage />
+      return <ChatPage />
     case "memory":
       return <MemoryPage />
     case "projects":

@@ -12,6 +12,7 @@ export type CreditOrder = { purchase_id: string; order_id: string; amount: numbe
 export const creditsApi = {
   overview: () => apiRequest<CreditOverview>("/credits/overview", { cacheTtlMs: 5_000 }),
   products: () => apiRequest<CreditProduct[]>("/credits/products", { cacheTtlMs: 30_000 }),
+  applyReferral: (code: string) => apiRequest<{ status: string }>("/credits/referrals/apply", { method: "POST", body: { code } }),
   createOrder: (productId: string) => apiRequest<CreditOrder>("/credits/purchases/order", { method: "POST", body: { product_id: productId } }),
   verify: async (orderId: string, paymentId: string, signature: string) => {
     const result = await apiRequest<{ status: string; credits: number }>("/credits/purchases/verify", { method: "POST", body: { order_id: orderId, payment_id: paymentId, signature } })

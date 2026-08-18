@@ -1,5 +1,10 @@
 import { apiRequest, apiStreamRequest, invalidateApiCache } from "./client"
 
+function notifyCreditUsageChanged() {
+  invalidateApiCache(["/credits"])
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ceaser:credits-changed"))
+}
+
 export interface ChatMessage {
   id: string
   role: "user" | "assistant" | "system"
@@ -182,6 +187,7 @@ export const chatApi = {
       },
     }).then((response) => {
       invalidateApiCache(["/conversations", conversationId ? `/chat/conversations/${conversationId}/messages` : "/chat/conversations"])
+      notifyCreditUsageChanged()
       return response
     }),
   sendCeaserMessageStream: (
@@ -215,6 +221,7 @@ export const chatApi = {
       },
     ).then((result) => {
       invalidateApiCache(["/conversations", conversationId ? `/chat/conversations/${conversationId}/messages` : "/chat/conversations"])
+      notifyCreditUsageChanged()
       return result
     }),
 }

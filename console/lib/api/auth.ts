@@ -86,8 +86,10 @@ export const authApi = {
   },
   signup: async (email: string, password: string) => {
     clearAuthTokens()
-    const session = await apiRequest<AuthSession>("/auth/signup", { method: "POST", body: { email, password } })
+    const referral_code = typeof window !== "undefined" ? window.localStorage.getItem("ceaser_referral_code") : null
+    const session = await apiRequest<AuthSession>("/auth/signup", { method: "POST", body: { email, password, referral_code } })
     setAuthTokens(session.access_token, session.refresh_token)
+    if (session.user && typeof window !== "undefined") window.localStorage.removeItem("ceaser_referral_code")
     return session
   },
   login: async (email: string, password: string) => {

@@ -799,6 +799,15 @@ export function SettingsPage() {
             <h2 className="text-2xl font-bold">System Status</h2>
             <p className="text-muted-foreground">Clean launch readiness without technical noise.</p>
             <SystemStatusCard />
+            <GlowCard>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h3 className="font-semibold">Desktop capabilities</h3><p className="text-sm text-muted-foreground">Live capabilities advertised by your connected CEASER devices.</p></div>
+                  <button onClick={() => void loadDesktopDevices()} disabled={desktopDevicesBusy} className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50">{desktopDevicesBusy ? "Checking..." : "Refresh"}</button>
+                </div>
+                <CapabilitySummary devices={desktopDevices} />
+              </div>
+            </GlowCard>
           </div>
         )}
 
@@ -1761,6 +1770,21 @@ function SettingSwitch({ checked, disabled, onChange }: { checked: boolean; disa
       <span className={cn("block h-5 w-5 rounded-full transition-transform", checked ? "translate-x-5 bg-primary" : "bg-muted-foreground")} />
     </button>
   )
+}
+
+function CapabilitySummary({ devices }: { devices: DesktopDevice[] }) {
+  const active = devices.filter((device) => device.status !== "revoked")
+  const capabilities = new Set(active.flatMap((device) => device.capabilities || []))
+  const groups = [
+    ["Apps", ["app.", "desktop.open_application"]], ["Windows", ["window."]], ["Network", ["network.", "wifi.", "bluetooth.", "vpn."]],
+    ["Audio", ["audio.", "media."]], ["Display", ["display.", "monitor.", "screen."]], ["Files", ["file.", "directory.", "storage."]],
+    ["Browser", ["browser."]], ["Development", ["project.", "git.", "development."]], ["Peripherals", ["printer.", "recycle."]],
+  ] as const
+  return <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{groups.map(([label, prefixes]) => {
+    const count = [...capabilities].filter((id) => prefixes.some((prefix) => id.startsWith(prefix))).length
+    const status = !active.length ? "Unsupported" : count ? "Available" : "Limited"
+    return <div key={label} className="flex items-center justify-between rounded-lg border border-border bg-background/50 px-3 py-2"><span className="text-sm font-medium">{label}</span><span className={cn("text-xs", status === "Available" ? "text-emerald-400" : status === "Limited" ? "text-amber-400" : "text-muted-foreground")}>{status}{count ? ` (${count})` : ""}</span></div>
+  })}</div>
 }
 
 function PreferenceSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {

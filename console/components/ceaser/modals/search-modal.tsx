@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, Bot, Brain, FileText, FolderKanban, MessageSquare, Workflow } from "lucide-react"
+import { Search, Brain, FileText, FolderKanban, MessageSquare, Workflow } from "lucide-react"
 import { useApp } from "@/lib/app-context"
 import type { AppPage } from "@/lib/ceaser"
-import { agents } from "@/lib/data"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { documentsApi, type GeneratedDocument } from "@/lib/api/documents"
 import { draftsApi, type DraftRecord } from "@/lib/api/drafts"
@@ -14,19 +13,17 @@ import { memoryApi, type MemoryRecord } from "@/lib/api/memory"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
 import { cn } from "@/lib/utils"
 
-type SearchCategory = "all" | "agents" | "projects" | "memories" | "chats" | "files" | "workflows"
+type SearchCategory = "all" | "projects" | "memories" | "chats" | "files" | "workflows"
 type SearchResult = {
   id: string
   type: SearchCategory
   title: string
   detail: string
   page: AppPage
-  agentId?: string
 }
 
 const categories: { label: string; value: SearchCategory }[] = [
   { label: "All", value: "all" },
-  { label: "Agents", value: "agents" },
   { label: "Projects", value: "projects" },
   { label: "Memories", value: "memories" },
   { label: "Chats", value: "chats" },
@@ -35,7 +32,7 @@ const categories: { label: string; value: SearchCategory }[] = [
 ]
 
 export function SearchModal() {
-  const { isSearchOpen, setIsSearchOpen, setCurrentPage, setSelectedAgentId } = useApp()
+  const { isSearchOpen, setIsSearchOpen, setCurrentPage } = useApp()
   const [query, setQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<SearchCategory>("all")
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -88,14 +85,6 @@ export function SearchModal() {
 
   const allResults = useMemo(() => {
     const results: SearchResult[] = [
-      ...agents.map((agent) => ({
-        id: `agent-${agent.id}`,
-        type: "agents" as const,
-        title: agent.name,
-        detail: agent.role,
-        page: "agents" as AppPage,
-        agentId: agent.id,
-      })),
       ...projects.map((project) => ({
         id: `project-${project.id}`,
         type: "projects" as const,
@@ -167,7 +156,6 @@ export function SearchModal() {
   }, [allResults, isSearchOpen, selectedIndex])
 
   const handleSelect = (result: SearchResult) => {
-    if (result.agentId) setSelectedAgentId(result.agentId)
     setCurrentPage(result.page)
     setIsSearchOpen(false)
   }
@@ -252,7 +240,6 @@ export function SearchModal() {
 
 function ResultIcon({ type }: { type: SearchCategory }) {
   const iconClass = "h-4 w-4"
-  if (type === "agents") return <Bot className={iconClass} />
   if (type === "projects") return <FolderKanban className={iconClass} />
   if (type === "memories") return <Brain className={iconClass} />
   if (type === "chats") return <MessageSquare className={iconClass} />

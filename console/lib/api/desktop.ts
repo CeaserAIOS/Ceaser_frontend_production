@@ -9,6 +9,8 @@ export interface DesktopDevice {
   last_seen_at?: string | null
   revoked_at?: string | null
   status: string
+  gateway_status?: string
+  capabilities?: string[]
 }
 
 export interface DesktopIntent {

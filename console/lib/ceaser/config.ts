@@ -254,8 +254,7 @@ export const ceaserEngines: CeaserEngine[] = [
 
 const baseNavigationItems: NavigationItem[] = [
   { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "agents", label: "Agents", icon: Users },
-  { id: "integrations", label: "Integrations", icon: Puzzle },
+  { id: "integrations", label: "Plugins", icon: Puzzle },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "files", label: "Files", icon: FileText },
   { id: "memory", label: "Memory", icon: BrainCircuit },

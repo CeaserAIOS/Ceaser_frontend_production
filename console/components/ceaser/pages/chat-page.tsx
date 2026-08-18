@@ -80,6 +80,16 @@ const launchAgents = [
   { name: "Designer", subtitle: "Design & creative", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12" },
 ]
 
+const studentWorkflowShortcuts = [
+  { title: "Exam Prep", prompt: "Create an exam preparation workflow from my syllabus with study notes and a revision plan." },
+  { title: "Research & Report", prompt: "Research my topic with current sources and create a verified report." },
+  { title: "Presentation Prep", prompt: "Research my topic and create a presentation with speaker notes." },
+  { title: "Weekly Study Plan", prompt: "Create a practical weekly study plan from my subjects and deadlines." },
+  { title: "Internship Prep", prompt: "Create an internship preparation workflow with resume review and interview questions." },
+  { title: "Project Demo Prep", prompt: "Prepare my project demo workflow with a report, presentation, and speaking outline." },
+  { title: "Lecture Notes → Revision Kit", prompt: "Turn my lecture notes into concise revision notes, key questions, and a study plan." },
+]
+
 const agentNameToId = (name: string) => name.toLowerCase()
 
 const detectDocumentRequest = (message: string): DocumentRequest | null => {
@@ -909,14 +919,29 @@ export function ChatPage() {
     }
   }
 
+  useEffect(() => {
+    const openConversation = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id
+      if (id) void handleSelectConversation(id)
+    }
+    const startNewConversation = () => void handleNewChat()
+    window.addEventListener("ceaser:open-conversation", openConversation)
+    window.addEventListener("ceaser:new-chat", startNewConversation)
+    return () => {
+      window.removeEventListener("ceaser:open-conversation", openConversation)
+      window.removeEventListener("ceaser:new-chat", startNewConversation)
+    }
+  })
+
   return (
     <div className={cn("ceaser-chat relative flex h-full overflow-hidden text-foreground", "bg-[#040714]")}>
       <div className={cn("pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.18)_1px,transparent_1px)] [background-size:36px_36px]", "opacity-[0.08]")} />
       <div className={cn("pointer-events-none absolute inset-0", "bg-[radial-gradient(circle_at_18%_0%,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_82%_100%,rgba(0,212,255,0.08),transparent_32%)]")} />
 
       <aside
+        aria-hidden="true"
         className={cn(
-          "relative z-20 flex h-full shrink-0 flex-col border-r border-border bg-card/72 backdrop-blur-xl transition-all duration-300",
+          "hidden relative z-20 h-full shrink-0 flex-col border-r border-border bg-card/72 backdrop-blur-xl transition-all duration-300",
           chatSidebarCollapsed ? "w-[68px]" : "w-[272px]",
         )}
       >
@@ -1113,7 +1138,7 @@ export function ChatPage() {
                 </div>
 
                 <div className="mx-auto mt-6 grid w-full max-w-[980px] grid-cols-2 gap-3 lg:grid-cols-5">{launchActions.map(({ title, subtitle, icon: Icon, color, prompt }) => <button key={title} onClick={() => setInput(prompt)} className="rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/30"><span className={cn("mb-4 flex h-9 w-9 items-center justify-center rounded-lg", color)}><Icon className="h-5 w-5" /></span><p className="text-sm font-medium text-white">{title}</p><p className="mt-1 text-xs text-white/45">{subtitle}</p></button>)}</div>
-                <div className="mx-auto mt-9 w-full max-w-[980px]"><h2 className="mb-3 text-lg font-medium text-white">Your Agents</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div></div>
+                <div className="mx-auto mt-9 w-full max-w-[980px]"><h2 className="mb-3 text-lg font-medium text-white">Your Agents</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div><div className="mt-5 flex gap-2 overflow-x-auto pb-2">{studentWorkflowShortcuts.map((item) => <button key={item.title} onClick={() => setInput(item.prompt)} className="shrink-0 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-xs text-cyan-100 hover:border-cyan-300/35">{item.title}</button>)}</div></div>
                 <p className="mt-8 text-center text-xs text-white/38">CEASER can make mistakes. Verify important information.</p>
               </>
             ) : (

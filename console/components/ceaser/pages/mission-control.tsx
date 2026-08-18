@@ -395,9 +395,12 @@ export function MissionControl() {
   }, [])
 
   useEffect(() => {
+    const refreshCredits = () => void creditsApi.overview().then(setCreditOverview).catch(() => undefined)
     void Promise.all([creditsApi.overview(), creditsApi.products()]).then(([wallet, products]) => {
       setCreditOverview(wallet); setCreditProducts(products)
     }).catch(() => undefined)
+    window.addEventListener("ceaser:credits-changed", refreshCredits)
+    return () => window.removeEventListener("ceaser:credits-changed", refreshCredits)
   }, [])
 
   const buyCredits = async (product: CreditProduct) => {

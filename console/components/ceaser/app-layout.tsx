@@ -34,15 +34,13 @@ export function AppLayout({ children }: AppLayoutProps) {
 function AppLayoutShell({ children }: AppLayoutProps) {
   const { currentPage } = useApp()
   const missionActive = currentPage === "mission-control" || currentPage === "student"
-  const chatActive = currentPage === "chat"
-
   return (
     <div className={cn("ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background", missionActive && "ceaser-mission-shell")}>
       {typeof window !== 'undefined' && !!(window as any).ceaserDesktop?.windowClose && <WindowTitlebar />}
       <div className="spatial-shell flex min-h-0 flex-1 overflow-hidden p-2">
-        {!chatActive && <Sidebar />}
-        <div className={cn("ceaser-app-frame flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card/55 shadow-[0_30px_100px_rgba(0,0,0,0.18)]", !chatActive && "ml-2", chatActive && "bg-[#030712]")}>
-          {!chatActive && <Header />}
+        <Sidebar />
+        <div className={cn("ceaser-app-frame ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card/55 shadow-[0_30px_100px_rgba(0,0,0,0.18)]", currentPage === "chat" && "bg-[#030712]")}>
+          {currentPage !== "chat" && <Header />}
           <main className="min-h-0 flex-1 overflow-y-auto">
             {children}
           </main>

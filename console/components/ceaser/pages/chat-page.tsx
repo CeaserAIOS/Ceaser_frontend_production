@@ -14,7 +14,7 @@ import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import { navigationItems } from "@/lib/ceaser"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Edit3, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react"
+import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Edit3, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -65,12 +65,22 @@ const creationActions = [
   { title: "Create Excel Sheet", subtitle: "Tables & trackers", prompt: "Create an Excel tracker for " },
 ]
 
-const launchActions = [
-  { title: "Create Presentation", subtitle: "Make a slide deck", icon: Presentation, color: "text-fuchsia-300 bg-fuchsia-500/12", prompt: "Create a presentation about " },
-  { title: "Write Document", subtitle: "Draft anything", icon: FileText, color: "text-blue-300 bg-blue-500/12", prompt: "Write a document about " },
-  { title: "Analyze Data", subtitle: "Insights & trends", icon: BarChart3, color: "text-emerald-300 bg-emerald-500/12", prompt: "Analyze this data: " },
-  { title: "Code Something", subtitle: "Generate code", icon: Code2, color: "text-orange-300 bg-orange-500/12", prompt: "Build " },
-  { title: "Brainstorm Ideas", subtitle: "Creative thinking", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12", prompt: "Brainstorm ideas for " },
+interface LaunchTask {
+  title: string
+  subtitle: string
+  icon: LucideIcon
+  color: string
+  instruction: string
+  output: string
+  requiresFile?: boolean
+}
+
+const launchActions: LaunchTask[] = [
+  { title: "Create Presentation", subtitle: "Generate a downloadable PPTX", icon: Presentation, color: "text-fuchsia-300 bg-fuchsia-500/12", instruction: "Create a presentation with speaker notes about", output: "PPTX presentation" },
+  { title: "Write Document", subtitle: "Generate a downloadable DOCX", icon: FileText, color: "text-blue-300 bg-blue-500/12", instruction: "Create a structured document about", output: "DOCX document" },
+  { title: "Analyze Data", subtitle: "Parse an attached dataset", icon: BarChart3, color: "text-emerald-300 bg-emerald-500/12", instruction: "Analyze the attached data and create a report with verified insights and charts for", output: "data analysis report", requiresFile: true },
+  { title: "Code Something", subtitle: "Build files in a project workspace", icon: Code2, color: "text-orange-300 bg-orange-500/12", instruction: "Build a working software project for", output: "code project" },
+  { title: "Brainstorm Ideas", subtitle: "Create a structured idea board", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12", instruction: "Create a structured document containing a brainstorm and action board for", output: "idea board document" },
 ]
 
 const launchAgents = [
@@ -81,14 +91,14 @@ const launchAgents = [
   { name: "Designer", subtitle: "Design & creative", icon: Lightbulb, color: "text-amber-300 bg-amber-500/12" },
 ]
 
-const studentWorkflowShortcuts = [
-  { title: "Exam Prep", prompt: "Create an exam preparation workflow from my syllabus with study notes and a revision plan." },
-  { title: "Research & Report", prompt: "Research my topic with current sources and create a verified report." },
-  { title: "Presentation Prep", prompt: "Research my topic and create a presentation with speaker notes." },
-  { title: "Weekly Study Plan", prompt: "Create a practical weekly study plan from my subjects and deadlines." },
-  { title: "Internship Prep", prompt: "Create an internship preparation workflow with resume review and interview questions." },
-  { title: "Project Demo Prep", prompt: "Prepare my project demo workflow with a report, presentation, and speaking outline." },
-  { title: "Lecture Notes → Revision Kit", prompt: "Turn my lecture notes into concise revision notes, key questions, and a study plan." },
+const studentWorkflowShortcuts: LaunchTask[] = [
+  { title: "Exam Prep", subtitle: "Notes and revision plan", icon: FileText, color: "text-cyan-300 bg-cyan-500/12", instruction: "Create study notes and a revision sheet for", output: "exam preparation document" },
+  { title: "Research & Report", subtitle: "Current sources and report", icon: Search, color: "text-violet-300 bg-violet-500/12", instruction: "Research current sources and create a verified report about", output: "research report" },
+  { title: "Presentation Prep", subtitle: "Slides and speaker notes", icon: Presentation, color: "text-fuchsia-300 bg-fuchsia-500/12", instruction: "Research and create a presentation with speaker notes about", output: "PPTX presentation" },
+  { title: "Weekly Study Plan", subtitle: "Subjects and deadlines", icon: CalendarPlus, color: "text-blue-300 bg-blue-500/12", instruction: "Create a practical weekly study plan for", output: "study plan document" },
+  { title: "Internship Prep", subtitle: "Resume and interview kit", icon: FileText, color: "text-emerald-300 bg-emerald-500/12", instruction: "Create a resume and interview kit for", output: "internship preparation document" },
+  { title: "Project Demo Prep", subtitle: "Report, slides and outline", icon: Presentation, color: "text-orange-300 bg-orange-500/12", instruction: "Create a report and presentation with a speaking outline for", output: "project demo kit" },
+  { title: "Lecture Notes to Revision Kit", subtitle: "Transform attached notes", icon: FileText, color: "text-cyan-300 bg-cyan-500/12", instruction: "Turn the attached lecture notes into study notes, key questions, and a study plan for", output: "revision kit document", requiresFile: true },
 ]
 
 const hfTextModelOptions = [
@@ -292,6 +302,8 @@ export function ChatPage() {
   const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false)
   const [modelPreference, setModelPreference] = useState("auto")
+  const [activeLaunchTask, setActiveLaunchTask] = useState<LaunchTask | null>(null)
+  const [launchTaskTopic, setLaunchTaskTopic] = useState("")
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isConversationLoading, setIsConversationLoading] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -894,6 +906,20 @@ export function ChatPage() {
     }
   }
 
+  const launchStructuredTask = () => {
+    if (!activeLaunchTask || !launchTaskTopic.trim()) return
+    if (activeLaunchTask.requiresFile && attachedFiles.length === 0) {
+      setLoadError("Attach the exact dataset you want CEASER to analyze before starting this task.")
+      chatFileInputRef.current?.click()
+      return
+    }
+    const request = `${activeLaunchTask.instruction} ${launchTaskTopic.trim()}. Required output: a real, validated ${activeLaunchTask.output}; do not return a text-only substitute.`
+    setActiveLaunchTask(null)
+    setLaunchTaskTopic("")
+    setLoadError(null)
+    void handleSend(request)
+  }
+
   useEffect(() => {
     if (!autoSendSeedRef.current || !input.trim() || isLoading || isBooting) return
     autoSendSeedRef.current = false
@@ -1021,6 +1047,8 @@ export function ChatPage() {
       window.removeEventListener("ceaser:new-chat", startNewConversation)
     }
   })
+
+  const ActiveLaunchIcon = activeLaunchTask?.icon ?? Sparkles
 
   return (
     <div className={cn("ceaser-chat relative flex h-full overflow-hidden text-foreground", "bg-[#040714]")}>
@@ -1249,8 +1277,8 @@ export function ChatPage() {
                   </div>
                 </div>
 
-                <div className="mx-auto mt-6 grid w-full max-w-[980px] grid-cols-2 gap-3 lg:grid-cols-5">{launchActions.map(({ title, subtitle, icon: Icon, color, prompt }) => <button key={title} onClick={() => setInput(prompt)} className="rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/30"><span className={cn("mb-4 flex h-9 w-9 items-center justify-center rounded-lg", color)}><Icon className="h-5 w-5" /></span><p className="text-sm font-medium text-white">{title}</p><p className="mt-1 text-xs text-white/45">{subtitle}</p></button>)}</div>
-                <div className="mx-auto mt-9 w-full max-w-[980px]"><h2 className="mb-3 text-lg font-medium text-white">Your Agents</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div><div className="mt-5 flex gap-2 overflow-x-auto pb-2">{studentWorkflowShortcuts.map((item) => <button key={item.title} onClick={() => setInput(item.prompt)} className="shrink-0 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-xs text-cyan-100 hover:border-cyan-300/35">{item.title}</button>)}</div></div>
+                <div className="mx-auto mt-6 grid w-full max-w-[980px] grid-cols-2 gap-3 lg:grid-cols-5">{launchActions.map((task) => { const Icon = task.icon; return <button key={task.title} onClick={() => { setActiveLaunchTask(task); setLaunchTaskTopic(""); setLoadError(null) }} className="rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/30"><span className={cn("mb-4 flex h-9 w-9 items-center justify-center rounded-lg", task.color)}><Icon className="h-5 w-5" /></span><p className="text-sm font-medium text-white">{task.title}</p><p className="mt-1 text-xs text-white/45">{task.subtitle}</p></button> })}</div>
+                <div className="mx-auto mt-9 w-full max-w-[980px]"><h2 className="mb-3 text-lg font-medium text-white">Your Agents</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{launchAgents.map(({ name, subtitle, icon: Icon, color }) => <button key={name} onClick={() => setInput(`${name}, help me with `)} className="flex min-h-24 items-center gap-3 rounded-xl border border-white/[0.08] bg-[#080e1c]/80 p-3 text-left hover:border-white/20"><span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}><Icon className="h-5 w-5" /></span><span><span className="block text-sm text-white">{name}</span><span className="mt-1 block text-xs leading-4 text-white/45">{subtitle}</span></span></button>)}</div><div className="mt-5 flex gap-2 overflow-x-auto pb-2">{studentWorkflowShortcuts.map((item) => <button key={item.title} onClick={() => { setActiveLaunchTask(item); setLaunchTaskTopic(""); setLoadError(null) }} className="shrink-0 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-xs text-cyan-100 hover:border-cyan-300/35">{item.title}</button>)}</div></div>
                 <p className="mt-8 text-center text-xs text-white/38">CEASER can make mistakes. Verify important information.</p>
               </>
             ) : (
@@ -1312,6 +1340,21 @@ export function ChatPage() {
           </div>
         </section>
       </main>
+      {activeLaunchTask ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/65 p-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={activeLaunchTask.title}>
+          <div className="w-full max-w-lg rounded-2xl border border-white/12 bg-[#080d1a] p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", activeLaunchTask.color)}><ActiveLaunchIcon className="h-5 w-5" /></span>
+              <div><h2 className="text-lg font-semibold text-white">{activeLaunchTask.title}</h2><p className="mt-1 text-sm text-white/50">CEASER will create and validate a real {activeLaunchTask.output}.</p></div>
+              <button onClick={() => setActiveLaunchTask(null)} className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-white/55 hover:bg-white/10 hover:text-white" aria-label="Close"><X className="h-4 w-4" /></button>
+            </div>
+            <label className="mt-5 block text-xs font-medium uppercase tracking-[0.14em] text-white/45">Topic or goal</label>
+            <textarea autoFocus value={launchTaskTopic} onChange={(event) => setLaunchTaskTopic(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) launchStructuredTask() }} placeholder="Describe what the finished result should contain..." className="mt-2 min-h-28 w-full resize-none rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/40" />
+            {activeLaunchTask.requiresFile ? <button onClick={() => chatFileInputRef.current?.click()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 hover:bg-white/[0.05]"><Paperclip className="h-3.5 w-3.5" />{attachedFiles.length ? `${attachedFiles.length} file(s) attached` : "Attach dataset"}</button> : null}
+            <div className="mt-5 flex justify-end gap-2"><button onClick={() => setActiveLaunchTask(null)} className="rounded-lg px-4 py-2 text-sm text-white/55 hover:bg-white/[0.05]">Cancel</button><button onClick={launchStructuredTask} disabled={!launchTaskTopic.trim()} className="rounded-lg bg-gradient-to-r from-cyan-500 to-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Start task</button></div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

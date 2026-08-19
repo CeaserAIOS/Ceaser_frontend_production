@@ -352,7 +352,10 @@ export function ChatPage() {
     [activeConversationId, conversations],
   )
 
-  const selectedModelLabel = useMemo(() => [...hfTextModelOptions, ...hfImageModelOptions].find((item) => item.id === modelPreference)?.label ?? "Auto", [modelPreference])
+  const selectedModelLabel = useMemo(() => {
+    const option = [...hfTextModelOptions, ...hfImageModelOptions].find((item) => item.id === modelPreference)
+    return option ? ("label" in option ? option.label : option.name) : "Auto"
+  }, [modelPreference])
   const isImageGenerationMode = useMemo(() => hfImageModelOptions.some((item) => item.id === modelPreference), [modelPreference])
 
   const filteredSavedResponses = useMemo(() => {
@@ -794,6 +797,22 @@ export function ChatPage() {
             responseMode: isImageGenerationMode ? "image" : "chat",
             imageModelPreference: isImageGenerationMode ? modelPreference : undefined,
           })
+        }
+      }
+
+      if (!response) {
+        response = {
+          scope: "personal_ai_os",
+          conversation_id: conversationId,
+          selected_agents: [],
+          contributions: [],
+          contribution_summary: "Response streamed.",
+          memories_used: [],
+          research: null,
+          workflow: null,
+          context_summary: {},
+          suggestions: [],
+          response: streamedContent || "CEASER could not complete that response. Please try again.",
         }
       }
 

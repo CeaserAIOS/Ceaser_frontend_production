@@ -261,10 +261,20 @@ function greetingForHour(hour: number) {
   return "Good evening"
 }
 
+const rotatingWelcomePrompts = [
+  "How can I help you today?",
+  "What would you like to create?",
+  "What can we solve together?",
+  "Where should we begin?",
+]
+
 export function ChatPage() {
   const { setCurrentPage, confirmDialog, promptDialog, pendingChatRequest, clearPendingChatRequest } = useApp()
   const [displayName, setDisplayName] = useState("there")
   const [timeGreeting, setTimeGreeting] = useState(() => greetingForHour(new Date().getHours()))
+  const [welcomePromptIndex, setWelcomePromptIndex] = useState(0)
+  const [typedWelcomePrompt, setTypedWelcomePrompt] = useState("")
+  const [isDeletingWelcomePrompt, setIsDeletingWelcomePrompt] = useState(false)
   const [conversations, setConversations] = useState<ConversationRecord[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -306,6 +316,26 @@ export function ChatPage() {
     const timer = window.setInterval(refreshGreeting, 60_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    const phrase = rotatingWelcomePrompts[welcomePromptIndex]
+    const isComplete = typedWelcomePrompt === phrase
+    const isEmpty = typedWelcomePrompt.length === 0
+    const delay = isComplete && !isDeletingWelcomePrompt ? 1800 : isEmpty && isDeletingWelcomePrompt ? 350 : isDeletingWelcomePrompt ? 32 : 58
+    const timer = window.setTimeout(() => {
+      if (isComplete && !isDeletingWelcomePrompt) {
+        setIsDeletingWelcomePrompt(true)
+        return
+      }
+      if (isEmpty && isDeletingWelcomePrompt) {
+        setIsDeletingWelcomePrompt(false)
+        setWelcomePromptIndex((current) => (current + 1) % rotatingWelcomePrompts.length)
+        return
+      }
+      setTypedWelcomePrompt(phrase.slice(0, typedWelcomePrompt.length + (isDeletingWelcomePrompt ? -1 : 1)))
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [isDeletingWelcomePrompt, typedWelcomePrompt, welcomePromptIndex])
 
   const captureScrollPosition = useCallback(() => {
     const container = chatScrollRef.current
@@ -1183,8 +1213,8 @@ export function ChatPage() {
             {!messages.length && !isBooting && !isActiveChatLoading ? (
               <>
                 <div className="mx-auto mb-6 flex w-fit rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-sm text-white/80">{timeGreeting}, {displayName} 👋</div>
-                <h1 className="text-center text-[38px] font-semibold leading-[1.08] text-white md:text-[46px]">
-                  How can <span className="ceaser-gradient-text">I help you today?</span>
+                <h1 className="flex min-h-[52px] items-center justify-center text-center text-[38px] font-semibold leading-[1.08] text-white md:min-h-[58px] md:text-[46px]" aria-live="polite">
+                  <span className="ceaser-gradient-text">{typedWelcomePrompt}</span><span className="ceaser-typewriter-caret" aria-hidden="true" />
                 </h1>
 
                 <div className="ceaser-composer mx-auto mt-10 flex min-h-[156px] w-full max-w-[980px] flex-col rounded-[22px] p-5 backdrop-blur-2xl">

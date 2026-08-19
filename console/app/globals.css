@@ -159,6 +159,23 @@
     -webkit-text-fill-color: transparent;
   }
 
+  .ceaser-typewriter-caret {
+    width: 2px;
+    height: 0.9em;
+    margin-left: 6px;
+    background: #7dd3fc;
+    animation: ceaser-typewriter-blink 0.8s steps(1, end) infinite;
+  }
+
+  @keyframes ceaser-typewriter-blink {
+    0%, 48% { opacity: 1; }
+    49%, 100% { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ceaser-typewriter-caret { animation: none; }
+  }
+
   .ceaser-primary-action {
     background: linear-gradient(100deg, #149ddd, #5569ff 55%, #7c3aed);
     box-shadow: 0 12px 30px rgba(79, 93, 255, 0.2);

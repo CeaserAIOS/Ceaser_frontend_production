@@ -137,6 +137,13 @@ export interface ResearchResult {
   images?: ResearchImage[]
 }
 
+export interface ChatRequestOptions {
+  modelPreference?: string
+  forceLiveWebSearch?: boolean
+  responseMode?: "chat" | "image"
+  imageModelPreference?: string
+}
+
 export const chatApi = {
   listConversations: (archived = false) => {
     const params = new URLSearchParams()
@@ -177,13 +184,17 @@ export const chatApi = {
       invalidateApiCache(["/conversations", `/chat/conversations/${conversationId}/messages`])
       return response
     }),
-  sendCeaserMessage: (message: string, conversationId?: string, fileIds?: string[]) =>
+  sendCeaserMessage: (message: string, conversationId?: string, fileIds?: string[], options: ChatRequestOptions = {}) =>
     apiRequest<CeaserChatResponse>("/ceaser/chat", {
       method: "POST",
       body: {
         message,
         conversation_id: conversationId,
         file_ids: fileIds ?? [],
+        model_preference: options.modelPreference,
+        force_live_web_search: options.forceLiveWebSearch ?? false,
+        response_mode: options.responseMode ?? "chat",
+        image_model_preference: options.imageModelPreference,
       },
     }).then((response) => {
       invalidateApiCache(["/conversations", conversationId ? `/chat/conversations/${conversationId}/messages` : "/chat/conversations"])
@@ -200,7 +211,7 @@ export const chatApi = {
       onComplete?: (response: CeaserChatResponse) => void
       onError?: (message: string) => void
     },
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal } & ChatRequestOptions,
   ) =>
     apiStreamRequest(
       "/ceaser/chat/stream",
@@ -211,6 +222,10 @@ export const chatApi = {
           message,
           conversation_id: conversationId,
           file_ids: fileIds ?? [],
+          model_preference: options?.modelPreference,
+          force_live_web_search: options?.forceLiveWebSearch ?? false,
+          response_mode: options?.responseMode ?? "chat",
+          image_model_preference: options?.imageModelPreference,
         },
       },
       {

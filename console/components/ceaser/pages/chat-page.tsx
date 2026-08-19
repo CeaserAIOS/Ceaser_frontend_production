@@ -93,10 +93,10 @@ const studentWorkflowShortcuts = [
 
 const hfTextModelOptions = [
   { id: "auto", label: "Auto" },
-  { id: "huggingface-primary", label: "Devstral Small 1.1" },
-  { id: "huggingface-qwen-qwen2-5-coder-7b-instruct", label: "Qwen2.5 Coder 7B" },
-  { id: "huggingface-deepseek-ai-deepseek-coder-v2-lite-instruct", label: "DeepSeek Coder V2 Lite" },
-  { id: "huggingface-bigcode-starcoder2-3b", label: "StarCoder2 3B" },
+  { id: "nvidia-nemotron-3-ultra-550b-a55b", label: "Nemotron 3 Ultra 550B" },
+  { id: "openai-primary", label: "OpenAI" },
+  { id: "groq-primary", label: "Groq" },
+  { id: "gemini-primary", label: "Gemini" },
 ]
 
 const isImageGenerationRequest = (message: string) => {

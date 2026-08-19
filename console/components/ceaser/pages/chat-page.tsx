@@ -8,7 +8,7 @@ import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { CeaserLogo } from "../ceaser-logo"
 import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
@@ -92,26 +92,18 @@ const studentWorkflowShortcuts = [
 ]
 
 const hfTextModelOptions = [
-  { id: "auto", label: "Auto", description: "CEASER picks the best available model for the prompt." },
-  { id: "huggingface-primary", label: "Devstral Small 1.1", description: "Best free coding and agentic model for software tasks." },
-  { id: "huggingface-qwen-2-5-coder-7b-instruct", label: "Qwen2.5 Coder 7B", description: "Balanced code generation, reasoning, and long-context chat." },
-  { id: "huggingface-deepseek-coder-v2-lite-instruct", label: "DeepSeek Coder V2 Lite", description: "Strong coding help with solid reasoning quality." },
-  { id: "huggingface-starcoder2-3b", label: "StarCoder2 3B", description: "Lightweight and fast for quick drafting or edits." },
+  { id: "auto", label: "Auto" },
+  { id: "huggingface-primary", label: "Devstral Small 1.1" },
+  { id: "huggingface-qwen-qwen2-5-coder-7b-instruct", label: "Qwen2.5 Coder 7B" },
+  { id: "huggingface-deepseek-ai-deepseek-coder-v2-lite-instruct", label: "DeepSeek Coder V2 Lite" },
+  { id: "huggingface-bigcode-starcoder2-3b", label: "StarCoder2 3B" },
 ]
 
-const hfImageModelOptions = [
-  { name: "FLUX.1 schnell", id: "black-forest-labs/FLUX.1-schnell", description: "Fast text-to-image generation under Apache-2.0 after accepting the model terms." },
-  { name: "Stable Diffusion XL Base 1.0", id: "stabilityai/stable-diffusion-xl-base-1.0", description: "Free text-to-image base model for creative generation." },
-]
-
-const hfDatasetOptions = [
-  { name: "The Stack", id: "bigcode/the-stack", description: "Large permissively licensed code dataset for code generation and completion." },
-  { name: "The Stack v2", id: "bigcode/the-stack-v2", description: "Next-generation code pretraining corpus with 600+ languages." },
-  { name: "The Stack v2 Train Smol IDs", id: "bigcode/the-stack-v2-train-smol-ids", description: "Smaller curated code subset useful for lightweight code work." },
-  { name: "CodeSearchNet", id: "sentence-transformers/codesearchnet", description: "Code search and embedding benchmark data for code understanding." },
-  { name: "UltraChat 200k", id: "HuggingFaceH4/ultrachat_200k", description: "Instruction-tuning conversations used to sharpen chat models." },
-  { name: "OpenAssistant OASST1", id: "OpenAssistant/oasst1", description: "Human-annotated assistant-style dialogue corpus." },
-]
+const isImageGenerationRequest = (message: string) => {
+  const normalized = message.toLowerCase().replace(/\s+/g, " ").trim()
+  return /\b(create|generate|make|design|draw|illustrate)\b/.test(normalized)
+    && /\b(image|picture|photo|illustration|artwork|poster|wallpaper|logo|thumbnail)\b/.test(normalized)
+}
 
 const agentNameToId = (name: string) => name.toLowerCase()
 
@@ -289,7 +281,6 @@ export function ChatPage() {
   const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false)
   const [modelPreference, setModelPreference] = useState("auto")
-  const [forceLiveWebSearch, setForceLiveWebSearch] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isConversationLoading, setIsConversationLoading] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -353,10 +344,9 @@ export function ChatPage() {
   )
 
   const selectedModelLabel = useMemo(() => {
-    const option = [...hfTextModelOptions, ...hfImageModelOptions].find((item) => item.id === modelPreference)
-    return option ? ("label" in option ? option.label : option.name) : "Auto"
+    const option = hfTextModelOptions.find((item) => item.id === modelPreference)
+    return option?.label ?? "Auto"
   }, [modelPreference])
-  const isImageGenerationMode = useMemo(() => hfImageModelOptions.some((item) => item.id === modelPreference), [modelPreference])
 
   const filteredSavedResponses = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
@@ -720,14 +710,14 @@ export function ChatPage() {
       let response: CeaserChatResponse | null = null
       let streamedContent = ""
       let receivedStreamContent = false
+      const imageGenerationRequested = isImageGenerationRequest(content)
       try {
         let streamError: string | null = null
-        if (isImageGenerationMode) {
+        if (imageGenerationRequested) {
           setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, statusLabel: "Generating image?" } : message))
           response = await chatApi.sendCeaserMessage(content, conversationId, fileIds, {
             modelPreference: modelPreference === "auto" ? undefined : modelPreference,
             responseMode: "image",
-            imageModelPreference: modelPreference === "auto" ? undefined : modelPreference,
             forceLiveWebSearch: false,
           })
         } else {
@@ -770,13 +760,13 @@ export function ChatPage() {
               if (streamSessionRef.current !== streamSessionId) return
               streamError = message
             },
-          }, { signal: controller.signal, modelPreference: modelPreference === "auto" ? undefined : modelPreference, forceLiveWebSearch })
+          }, { signal: controller.signal, modelPreference: modelPreference === "auto" ? undefined : modelPreference, forceLiveWebSearch: true })
           if (streamError) throw new Error(streamError)
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return
-        if (isImageGenerationMode) throw error
-        if (!isImageGenerationMode && receivedStreamContent) {
+        if (imageGenerationRequested) throw error
+        if (receivedStreamContent) {
           response = {
             scope: "personal_ai_os",
             conversation_id: conversationId,
@@ -793,9 +783,8 @@ export function ChatPage() {
         } else {
           response = await chatApi.sendCeaserMessage(content, conversationId, fileIds, {
             modelPreference: modelPreference === "auto" ? undefined : modelPreference,
-            forceLiveWebSearch: isImageGenerationMode ? false : forceLiveWebSearch,
-            responseMode: isImageGenerationMode ? "image" : "chat",
-            imageModelPreference: isImageGenerationMode ? modelPreference : undefined,
+            forceLiveWebSearch: true,
+            responseMode: "chat",
           })
         }
       }
@@ -1205,54 +1194,14 @@ export function ChatPage() {
                           <span className="max-w-28 truncate text-xs font-medium">{selectedModelLabel}</span>
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" side="top" sideOffset={12} className="w-[360px] border-white/10 bg-[#050914]/98 p-3 text-white shadow-2xl backdrop-blur-xl">
-                        <div className="space-y-3">
-                          <div>
-                            <DropdownMenuLabel className="px-0 py-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">Free text models</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup value={modelPreference} onValueChange={setModelPreference} className="mt-2 space-y-1">
-                              {hfTextModelOptions.map((item) => (
-                                <DropdownMenuRadioItem key={item.id} value={item.id} className="rounded-xl px-2.5 py-2 text-sm data-[state=checked]:bg-white/[0.06]">
-                                  <span className="flex flex-col items-start gap-0.5">
-                                    <span className="font-medium text-white">{item.label}</span>
-                                    <span className="text-xs text-white/45">{item.description}</span>
-                                  </span>
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </div>
-                          <DropdownMenuSeparator className="bg-white/10" />
-                          <DropdownMenuCheckboxItem checked={forceLiveWebSearch} onCheckedChange={(checked) => setForceLiveWebSearch(Boolean(checked))} className="rounded-xl px-2.5 py-2 text-sm text-white data-[state=checked]:bg-white/[0.06]">
-                            <span className="flex flex-col items-start gap-0.5">
-                              <span className="font-medium text-white">Live web search</span>
-                              <span className="text-xs text-white/45">Use live sources for current facts, prices, news, and research.</span>
-                            </span>
-                          </DropdownMenuCheckboxItem>
-                          <DropdownMenuSeparator className="bg-white/10" />
-                          <div className="grid gap-3">
-                            <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">Free image models</p>
-                              <div className="mt-2 space-y-2">
-                                {hfImageModelOptions.map((item) => (
-                                  <div key={item.id} className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                                    <p className="text-sm font-medium text-white">{item.name}</p>
-                                    <p className="mt-0.5 text-xs text-white/45">{item.description}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">Reference datasets</p>
-                              <div className="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1">
-                                {hfDatasetOptions.map((item) => (
-                                  <div key={item.id} className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                                    <p className="text-sm font-medium text-white">{item.name}</p>
-                                    <p className="mt-0.5 text-xs text-white/45">{item.description}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                      <DropdownMenuContent align="start" side="top" sideOffset={12} className="w-[260px] border-white/10 bg-[#050914]/98 p-2 text-white shadow-2xl backdrop-blur-xl">
+                        <DropdownMenuRadioGroup value={modelPreference} onValueChange={setModelPreference} className="space-y-1">
+                          {hfTextModelOptions.map((item) => (
+                            <DropdownMenuRadioItem key={item.id} value={item.id} className="rounded-lg px-2.5 py-2 text-sm font-medium text-white data-[state=checked]:bg-white/[0.06]">
+                              {item.label}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <button onClick={() => chatFileInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.025] text-white/70"><Plus className="h-5 w-5" /></button>

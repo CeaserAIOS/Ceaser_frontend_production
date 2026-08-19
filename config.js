@@ -16,8 +16,8 @@
     DOWNLOAD_URL: "/downloads/",
     API_BASE_URL: "https://ceaser-backend-production.onrender.com",
     SUPABASE_URL: "https://rrfqqgxhmimffrcckxay.supabase.co",
-    CONTACT_EMAIL: "hello@ceaser.tech",
-    SUPPORT_EMAIL: "support@ceaser.tech",
+    CONTACT_EMAIL: "teamceaser@heyceaser.in",
+    SUPPORT_EMAIL: "teamceaser@heyceaser.in",
     PROTECTED_ROUTES: [
       "/dashboard", "/app", "/chat", "/projects",
       "/files", "/memory", "/agents", "/settings", "/admin",

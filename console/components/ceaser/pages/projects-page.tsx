@@ -224,6 +224,8 @@ export function ProjectsPage() {
       "Create a practical, detailed document with numbered phases, tasks, owners, dependencies, deadlines, risks, success checks, and measurable next actions.",
     ].filter(Boolean)
 
+    const exactFileIds = files.filter((file) => file.project_id === selectedProject.id).map((file) => file.id)
+    window.localStorage.setItem("ceaser_project_file_ids", JSON.stringify(exactFileIds))
     startNewChatWithPrompt(sections.join("\n\n"))
     setIsWorkflowModalOpen(false)
     setWorkflowForm({ goal: "", phases: "", owners: "", dependencies: "", deadlines: "", risks: "", successChecks: "" })
@@ -265,6 +267,16 @@ export function ProjectsPage() {
       window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
       return next
     })
+  }
+
+  function openProjectChat(project: ProjectRecord, prompt: string) {
+    const exactFileIds = files.filter((file) => file.project_id === project.id).map((file) => file.id)
+    window.localStorage.setItem("ceaser_project_file_ids", JSON.stringify(exactFileIds))
+    window.localStorage.setItem(
+      "ceaser_chat_seed",
+      `${prompt}\n\nActive project: ${project.name}\nProject description: ${project.description || "No description added."}`,
+    )
+    setCurrentPage("chat")
   }
 
   return (
@@ -407,18 +419,13 @@ export function ProjectsPage() {
         }}
         onContinueResearch={() => {
           if (selectedProject) {
-            window.localStorage.setItem(
-              "ceaser_chat_seed",
-              `Continue research for ${selectedProject.name}. Context: ${selectedProject.description || "No description added."}`,
-            )
+            openProjectChat(selectedProject, "Continue this project's research using its connected files and current project context.")
           }
           setSelectedAgentId("nova")
-          setCurrentPage("chat")
         }}
         onVoiceMode={() => setIsVoiceModalOpen(true)}
         onAskProject={(question) => {
-          if (selectedProject) window.localStorage.setItem("ceaser_chat_seed", `${question}\n\nProject: ${selectedProject.name}\nContext: ${selectedProject.description || "No description added."}`)
-          setCurrentPage("chat")
+          if (selectedProject) openProjectChat(selectedProject, question)
         }}
       />
 

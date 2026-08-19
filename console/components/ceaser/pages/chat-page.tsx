@@ -276,6 +276,7 @@ export function ChatPage() {
   const [attachedFiles, setAttachedFiles] = useState<FileRecord[]>([])
   const [isBooting, setIsBooting] = useState(true)
   const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null)
+  const [seededProjectFileIds, setSeededProjectFileIds] = useState<string[]>([])
   const [showArchivedChats, setShowArchivedChats] = useState(false)
   const [showSavedResponses, setShowSavedResponses] = useState(false)
   const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
@@ -442,6 +443,13 @@ export function ChatPage() {
     const boot = async () => {
       setIsBooting(true)
       const seed = window.localStorage.getItem("ceaser_chat_seed")
+      try {
+        const projectFileIds = JSON.parse(window.localStorage.getItem("ceaser_project_file_ids") || "[]")
+        setSeededProjectFileIds(Array.isArray(projectFileIds) ? projectFileIds.filter((id): id is string => typeof id === "string") : [])
+      } catch {
+        setSeededProjectFileIds([])
+      }
+      window.localStorage.removeItem("ceaser_project_file_ids")
       // A workflow request must always open a new conversation. Do not let the
       // asynchronous conversation-list load restore an older chat over it.
       const startsNewChat = Boolean(pendingChatRequest || seed)
@@ -522,9 +530,11 @@ export function ChatPage() {
     setLoadError(null)
     setIsConversationLoading(false)
     setAttachedFiles([])
+    setSeededProjectFileIds([])
   }
 
   const handleSelectConversation = async (conversationId: string) => {
+    setSeededProjectFileIds([])
     if (activeConversationId === conversationId) return
     cancelActiveStream()
     setShowSavedResponses(false)
@@ -701,7 +711,7 @@ export function ChatPage() {
       conversationId = await ensureConversation()
       const seededMessages = [...messages, userMessage, typingMessage]
       conversationCacheRef.current.set(conversationId, seededMessages)
-      const fileIds = attachedFiles.map((file) => file.id)
+      const fileIds = Array.from(new Set([...attachedFiles.map((file) => file.id), ...seededProjectFileIds]))
       const controller = new AbortController()
       streamAbortRef.current = controller
       const streamSessionId = ++streamSessionRef.current
@@ -1156,7 +1166,7 @@ export function ChatPage() {
 
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="relative flex min-h-0 w-full flex-1 flex-col px-8 pb-5 lg:px-16">
-          {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{activeConversation?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1>{activeConversation ? <button onClick={() => void handleTogglePinConversation(activeConversation)} className={cn("ml-3 transition hover:text-cyan-200", activeConversation.pinned ? "text-cyan-300" : "text-white/55")} title={activeConversation.pinned ? "Unpin chat" : "Pin chat"} aria-label={activeConversation.pinned ? "Unpin chat" : "Pin chat"}><Star className={cn("h-4 w-4", activeConversation.pinned && "fill-current")} /></button> : null}</header> : null}
+          {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{activeConversation?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1>{activeConversation ? <><button onClick={() => void handleTogglePinConversation(activeConversation)} className={cn("ml-3 transition hover:text-cyan-200", activeConversation.pinned ? "text-cyan-300" : "text-white/55")} title={activeConversation.pinned ? "Unpin chat" : "Pin chat"} aria-label={activeConversation.pinned ? "Unpin chat" : "Pin chat"}><Star className={cn("h-4 w-4", activeConversation.pinned && "fill-current")} /></button><div className="relative ml-auto"><button onClick={() => setOpenConversationMenuId(openConversationMenuId === activeConversation.id ? null : activeConversation.id)} className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Chat options"><MoreHorizontal className="h-5 w-5" /></button>{openConversationMenuId === activeConversation.id ? <div className="absolute right-0 top-11 z-40 w-48 rounded-2xl border border-border bg-popover p-2 shadow-2xl"><ConversationMenuItem icon={Edit3} label="Rename" onClick={() => void handleRenameConversation(activeConversation)} /><ConversationMenuItem icon={activeConversation.pinned ? PinOff : Pin} label={activeConversation.pinned ? "Unpin" : "Pin"} onClick={() => void handleTogglePinConversation(activeConversation)} /><ConversationMenuItem icon={activeConversation.archived ? RotateCcw : Archive} label={activeConversation.archived ? "Unarchive" : "Archive"} onClick={() => void (activeConversation.archived ? handleUnarchiveConversation(activeConversation) : handleArchiveConversation(activeConversation))} /><ConversationMenuItem icon={Trash2} label="Delete" onClick={() => void handleDeleteConversation(activeConversation)} danger /></div> : null}</div></> : null}</header> : null}
           {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button></div> : null}
           <div
             ref={chatScrollRef}

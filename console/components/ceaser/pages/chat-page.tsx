@@ -826,7 +826,7 @@ export function ChatPage() {
               if (streamSessionRef.current !== streamSessionId) return
               streamError = message
             },
-          }, { signal: controller.signal, modelPreference: modelPreference === "auto" ? undefined : modelPreference, forceLiveWebSearch: true })
+          }, { signal: controller.signal, modelPreference: modelPreference === "auto" ? undefined : modelPreference, forceLiveWebSearch: false })
           if (streamError) throw new Error(streamError)
         }
       } catch (error) {
@@ -847,11 +847,7 @@ export function ChatPage() {
             response: streamedContent,
           }
         } else {
-          response = await chatApi.sendCeaserMessage(content, conversationId, fileIds, {
-            modelPreference: modelPreference === "auto" ? undefined : modelPreference,
-            forceLiveWebSearch: true,
-            responseMode: "chat",
-          })
+          throw error
         }
       }
 

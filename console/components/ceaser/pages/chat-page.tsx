@@ -287,7 +287,9 @@ const rotatingWelcomePrompts = [
 export function ChatPage() {
   const { setCurrentPage, confirmDialog, promptDialog, pendingChatRequest, clearPendingChatRequest } = useApp()
   const [displayName, setDisplayName] = useState("there")
-  const [timeGreeting, setTimeGreeting] = useState(() => greetingForHour(new Date().getHours()))
+  // Keep the server and first client render deterministic; update to local
+  // time after hydration in the existing interval effect below.
+  const [timeGreeting, setTimeGreeting] = useState("Good afternoon")
   const [welcomePromptIndex, setWelcomePromptIndex] = useState(0)
   const [typedWelcomePrompt, setTypedWelcomePrompt] = useState("")
   const [isDeletingWelcomePrompt, setIsDeletingWelcomePrompt] = useState(false)

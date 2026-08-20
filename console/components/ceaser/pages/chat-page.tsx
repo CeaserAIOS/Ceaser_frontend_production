@@ -873,10 +873,11 @@ export function ChatPage() {
         return next
       })
       if (conversationId) {
+        const convoId = conversationId
         void (async () => {
           for (let attempt = 0; attempt < 10; attempt += 1) {
             try {
-              const persistedMessages = await chatApi.listMessages(conversationId, 12)
+              const persistedMessages = await chatApi.listMessages(convoId, 12)
               const persistedAssistant = [...persistedMessages].reverse().find((message) => message.role === "assistant")
               if (!persistedAssistant) {
                 await new Promise((resolve) => window.setTimeout(resolve, 250))
@@ -893,7 +894,7 @@ export function ChatPage() {
                     ? { ...hydratedAssistant, isTyping: false, isStreaming: false }
                     : message,
                 )
-                conversationCacheRef.current.set(conversationId, next)
+                conversationCacheRef.current.set(convoId, next)
                 return next
               })
               break

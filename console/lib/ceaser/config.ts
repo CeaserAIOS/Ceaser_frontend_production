@@ -29,6 +29,8 @@ export const ceaserUser = {
 
 export const ENABLE_STUDENT_HUB = process.env.NEXT_PUBLIC_ENABLE_STUDENT_HUB === "true"
 
+export const ENABLE_BILLING_SECTION = process.env.NEXT_PUBLIC_ENABLE_BILLING_SECTION === "true"
+
 export const ceaserAgents: CeaserAgent[] = [
   {
     id: "ceaser",
@@ -265,4 +267,3 @@ export const navigationItems: NavigationItem[] = baseNavigationItems.filter((ite
 export const getAgent = (id: string) => ceaserAgents.find((agent) => agent.id === id)
 export const getEngine = (id: string) => ceaserEngines.find((engine) => engine.id === id)
 export const getPageTitle = (id: string) => navigationItems.find((item) => item.id === id)?.label ?? "Chat"
-

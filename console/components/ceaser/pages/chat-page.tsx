@@ -117,6 +117,11 @@ const isImageGenerationRequest = (message: string) => {
 
 const agentNameToId = (name: string) => name.toLowerCase()
 
+const stripSandboxArtifactLinks = (content: string) =>
+  content
+    .replace(/\[([^\]]+)\]\((?:sandbox:|https?:\/\/[^)]+\/(?:download|files\/[^)]+\/download)[^)]+)\)/gi, "$1")
+    .trim()
+
 const detectDocumentRequest = (message: string): DocumentRequest | null => {
   const normalized = message.toLowerCase()
   if (!/\b(create|write|draft|generate|make|prepare)\b/.test(normalized)) return null
@@ -321,6 +326,10 @@ export function ChatPage() {
   const autoSendSeedRef = useRef(false)
   const processedChatRequestRef = useRef<string | null>(null)
   const isProgrammaticScrollRef = useRef(false)
+  const userInitial = useMemo(() => {
+    const initial = displayName.trim().charAt(0).toUpperCase()
+    return initial || "U"
+  }, [displayName])
 
   useEffect(() => {
     const refreshGreeting = () => setTimeGreeting(greetingForHour(new Date().getHours()))
@@ -857,30 +866,43 @@ export function ChatPage() {
         }
       }
 
-      let assistantMessage: Message = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
-      // The streaming completion payload can be intentionally compact. The
-      // persisted turn is authoritative and contains the final rich-response
-      // metadata that a page reload would otherwise be required to restore.
-      if (conversationId) {
-        try {
-          const persistedMessages = await chatApi.listMessages(conversationId, 12)
-          const persistedAssistant = [...persistedMessages].reverse().find((message) => message.role === "assistant")
-          if (persistedAssistant) {
-            assistantMessage = {
-              ...normalizeMessage(persistedAssistant),
-              id: typingMessage.id,
-              documentRequest: documentRequest ?? undefined,
-            }
-          }
-        } catch {
-          // Keep the completed streamed response when hydration is unavailable.
-        }
-      }
+      const assistantMessage: Message = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
       setMessages((current) => {
         const next = current.map((message) => (message.id === typingMessage.id ? { ...assistantMessage, isTyping: false, isStreaming: false } : message))
         if (conversationId) conversationCacheRef.current.set(conversationId, next)
         return next
       })
+      if (conversationId) {
+        void (async () => {
+          for (let attempt = 0; attempt < 10; attempt += 1) {
+            try {
+              const persistedMessages = await chatApi.listMessages(conversationId, 12)
+              const persistedAssistant = [...persistedMessages].reverse().find((message) => message.role === "assistant")
+              if (!persistedAssistant) {
+                await new Promise((resolve) => window.setTimeout(resolve, 250))
+                continue
+              }
+              const hydratedAssistant = {
+                ...normalizeMessage(persistedAssistant),
+                id: typingMessage.id,
+                documentRequest: documentRequest ?? undefined,
+              }
+              setMessages((current) => {
+                const next = current.map((message) =>
+                  message.id === typingMessage.id
+                    ? { ...hydratedAssistant, isTyping: false, isStreaming: false }
+                    : message,
+                )
+                conversationCacheRef.current.set(conversationId, next)
+                return next
+              })
+              break
+            } catch {
+              await new Promise((resolve) => window.setTimeout(resolve, 250))
+            }
+          }
+        })()
+      }
       requestAnimationFrame(() => {
         console.info("[CEASER LATENCY] frontend_render_ms", Math.round(performance.now() - clientStreamStartedAt), "first_token_ms", firstTokenAt === null ? null : Math.round(firstTokenAt - clientStreamStartedAt))
       })
@@ -1296,6 +1318,7 @@ export function ChatPage() {
                       previousUserPrompt={findPreviousUserPrompt(messages, index)}
                       onPromptSelect={queueFollowUp}
                       onEdit={handleEditSentMessage}
+                      userInitial={userInitial}
                     />
                   ))
                 )}
@@ -1516,11 +1539,13 @@ function ChatBubble({
   previousUserPrompt,
   onPromptSelect,
   onEdit,
+  userInitial,
 }: {
   message: Message
   previousUserPrompt?: string
   onPromptSelect: (prompt: string) => void
   onEdit: (message: Message) => void
+  userInitial: string
 }) {
   const isUser = message.role === "user"
   return (
@@ -1545,7 +1570,7 @@ function ChatBubble({
                 ? <ProjectReportCard report={parseProjectReport(message.content)!} />
                 : message.role === "assistant" && !message.isStreaming && parseFridayStructuredResponse(message.content)
                 ? <StructuredResponseCard response={parseFridayStructuredResponse(message.content)!} />
-                : <MarkdownMessage content={message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
+                : <MarkdownMessage content={message.role === "assistant" ? stripSandboxArtifactLinks(message.content) : message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
             {message.role === "assistant" && !message.isStreaming && message.research?.images?.length ? (
               <ResearchImageStrip images={message.research.images} />
             ) : message.role === "assistant" && !message.isStreaming && message.research?.sources?.some((source) => source.image_url) ? (
@@ -1570,7 +1595,7 @@ function ChatBubble({
       </div>
       {isUser && (
         <div className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-700 text-xs font-semibold text-white">
-          A
+          {userInitial}
         </div>
       )}
     </div>

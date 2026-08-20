@@ -9,6 +9,7 @@ import { CeaserSelect } from "../ceaser-select"
 import { SystemStatusCard } from "../system-status-card"
 import { authApi } from "@/lib/api/auth"
 import { getAccessToken } from "@/lib/api/client"
+import { ENABLE_BILLING_SECTION } from "@/lib/ceaser/config"
 import {
   commercialApi,
   type BillingCreateSubscriptionResponse,
@@ -76,12 +77,14 @@ const settingsSections = [
   },
 
 
-  {
-    id: "billing",
-    label: "Billing & Student Access",
-    icon: CreditCard,
-    description: "Plans, usage, verification"
-  },
+  ...(ENABLE_BILLING_SECTION
+    ? [{
+      id: "billing",
+      label: "Billing & Student Access",
+      icon: CreditCard,
+      description: "Plans, usage, verification",
+    }]
+    : []),
   { 
     id: "security", 
     label: "Security", 
@@ -193,6 +196,11 @@ export function SettingsPage() {
   const commercialPrefetchRef = useRef(false)
   const plansSectionRef = useRef<HTMLDivElement | null>(null)
   const invoicesSectionRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!ENABLE_BILLING_SECTION && activeSection === "billing") {
+      setActiveSection("status")
+    }
+  }, [activeSection])
   useEffect(() => {
     try {
       const savedProfile = JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null")
@@ -963,7 +971,7 @@ export function SettingsPage() {
             </GlowCard>
           </div>
         )}
-        {activeSection === "billing" && (() => {
+        {ENABLE_BILLING_SECTION && activeSection === "billing" && (() => {
           const fallbackPlan =
             commercialPlans.find((plan) => plan.code === "FREE") ||
             commercialPlans[0] ||

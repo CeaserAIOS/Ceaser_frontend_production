@@ -761,12 +761,17 @@ export function ChatPage() {
       isStreaming: true,
     }
     setMessages((current) => [...current, userMessage, typingMessage])
+    const sendClickedAt = performance.now()
+    console.info("[CEASER LATENCY] send_clicked")
+    console.info("[CEASER LATENCY] user_message_rendered", Math.round(performance.now() - sendClickedAt))
 
-    let conversationId: string | null = null
+    let conversationId: string | null = activeConversationId && !showArchivedChats ? activeConversationId : null
     try {
-      conversationId = await ensureConversation()
-      const seededMessages = [...messages, userMessage, typingMessage]
-      conversationCacheRef.current.set(conversationId, seededMessages)
+      console.info("[CEASER LATENCY] stream_request_start")
+      if (conversationId) {
+        const seededMessages = [...messages, userMessage, typingMessage]
+        conversationCacheRef.current.set(conversationId, seededMessages)
+      }
       const fileIds = Array.from(new Set([...attachedFiles.map((file) => file.id), ...seededProjectFileIds]))
       const controller = new AbortController()
       streamAbortRef.current = controller
@@ -781,13 +786,13 @@ export function ChatPage() {
         let streamError: string | null = null
         if (imageGenerationRequested) {
           setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, statusLabel: "Generating image?" } : message))
-          response = await chatApi.sendCeaserMessage(content, conversationId, fileIds, {
+          response = await chatApi.sendCeaserMessage(content, conversationId ?? undefined, fileIds, {
             modelPreference: modelPreference === "auto" ? undefined : modelPreference,
             responseMode: "image",
             forceLiveWebSearch: false,
           })
         } else {
-          await chatApi.sendCeaserMessageStream(content, conversationId, fileIds, {
+          await chatApi.sendCeaserMessageStream(content, conversationId ?? undefined, fileIds, {
             onStatus: (payload) => {
               if (streamSessionRef.current !== streamSessionId) return
               const state = String(payload.state || "")
@@ -804,6 +809,7 @@ export function ChatPage() {
               if (firstTokenAt === null) {
                 firstTokenAt = performance.now()
                 console.info("[CEASER LATENCY] frontend_first_token_ms", Math.round(firstTokenAt - clientStreamStartedAt))
+                console.info("[CEASER LATENCY] first_content_token")
               }
               streamedContent += text
               receivedStreamContent = true
@@ -821,6 +827,11 @@ export function ChatPage() {
                 `[CEASER LLM] provider=${String(streamedResponse.context_summary?.provider ?? "not reported")} model=${String(streamedResponse.context_summary?.model ?? "not reported")} fallback_used=${String(streamedResponse.context_summary?.fallback_used ?? false)} agents=${streamedResponse.selected_agents.join(",") || "none"}`,
               )
               response = streamedResponse
+              if (streamedResponse.conversation_id) {
+                conversationId = streamedResponse.conversation_id
+                setActiveConversationId(streamedResponse.conversation_id)
+                window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, streamedResponse.conversation_id)
+              }
             },
             onError: (message) => {
               if (streamSessionRef.current !== streamSessionId) return

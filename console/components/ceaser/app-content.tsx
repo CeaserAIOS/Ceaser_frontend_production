@@ -2,15 +2,17 @@
 
 import { useApp } from "@/lib/app-context"
 import { ENABLE_STUDENT_HUB } from "@/lib/ceaser"
+import dynamic from "next/dynamic"
 import { ChatPage } from "./pages/chat-page"
-import { StudentPage } from "./pages/student-page"
-import { MemoryPage } from "./pages/memory-page"
-import { ProjectsPage } from "./pages/projects-page"
-import { GoalsPage } from "./pages/goals-page"
-import { FilesPage } from "./pages/files-page"
-import { IntegrationsPage } from "./pages/integrations-page"
-import { SettingsPage } from "./pages/settings-page"
-import { AdminPage } from "./pages/admin-page"
+
+const StudentPage = dynamic(() => import("./pages/student-page").then((module) => module.StudentPage))
+const MemoryPage = dynamic(() => import("./pages/memory-page").then((module) => module.MemoryPage))
+const ProjectsPage = dynamic(() => import("./pages/projects-page").then((module) => module.ProjectsPage))
+const GoalsPage = dynamic(() => import("./pages/goals-page").then((module) => module.GoalsPage))
+const FilesPage = dynamic(() => import("./pages/files-page").then((module) => module.FilesPage))
+const IntegrationsPage = dynamic(() => import("./pages/integrations-page").then((module) => module.IntegrationsPage))
+const SettingsPage = dynamic(() => import("./pages/settings-page").then((module) => module.SettingsPage))
+const AdminPage = dynamic(() => import("./pages/admin-page").then((module) => module.AdminPage))
 
 export function AppContent() {
   const { currentPage } = useApp()

@@ -11,6 +11,7 @@ import { WindowTitlebar } from "./window-titlebar"
 import { useEffect, useState, type ReactNode } from "react"
 import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
+import { recordStartupMetric } from "@/lib/api/client"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -33,6 +34,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
 function AppLayoutShell({ children }: AppLayoutProps) {
   const { currentPage } = useApp()
+  useEffect(() => {
+    recordStartupMetric("app_navigation_start", { page: currentPage })
+    recordStartupMetric("shell_visible")
+  }, [])
   return (
     <div className="ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background">
       {typeof window !== 'undefined' && !!(window as any).ceaserDesktop?.windowClose && <WindowTitlebar />}

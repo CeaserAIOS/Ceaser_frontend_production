@@ -22,6 +22,30 @@ const REFRESH_TOKEN_KEY = "ceaser_refresh_token"
 let refreshPromise: Promise<string | null> | null = null
 const CACHE_PREFIX = "ceaser_api_cache:"
 const DEFAULT_CACHE_TTL_MS = 60_000
+const inFlightRequests = new Map<string, Promise<unknown>>()
+
+export type StartupMetricName =
+  | "app_navigation_start"
+  | "shell_visible"
+  | "composer_rendered"
+  | "input_interactive"
+  | "auth_verify_start"
+  | "auth_ready"
+  | "first_api_start"
+  | "first_api_response"
+  | "conversation_list_ready"
+  | "core_data_ready"
+  | "secondary_data_ready"
+
+export function recordStartupMetric(name: StartupMetricName, detail: Record<string, unknown> = {}) {
+  if (typeof window === "undefined") return
+  const elapsedMs = Math.round(performance.now())
+  performance.mark(`ceaser:${name}`)
+  window.dispatchEvent(new CustomEvent("ceaser:startup-metric", {
+    detail: { name, elapsed_ms: elapsedMs, ...detail },
+  }))
+  console.info("[CEASER STARTUP]", name, { elapsed_ms: elapsedMs, ...detail })
+}
 
 export function getAccessToken() {
   if (typeof window === "undefined") return null
@@ -47,6 +71,8 @@ export function clearAuthTokens() {
   if (typeof window === "undefined") return
   window.localStorage.removeItem(ACCESS_TOKEN_KEY)
   window.localStorage.removeItem(REFRESH_TOKEN_KEY)
+  invalidateApiCache()
+  inFlightRequests.clear()
 }
 
 export function invalidateApiCache(pathPrefixes: string[] = []) {
@@ -123,8 +149,12 @@ function shouldRefresh(path: string) {
 }
 
 async function request<T>(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
+  const startedAt = typeof performance === "undefined" ? 0 : performance.now()
+  if (typeof window !== "undefined" && !performance.getEntriesByName("ceaser:first_api_start").length) {
+    recordStartupMetric("first_api_start", { path })
+  }
   try {
-    return await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       signal: options.signal ?? AbortSignal.timeout(timeoutFor(path)),
       headers: {
@@ -134,6 +164,17 @@ async function request<T>(path: string, options: RequestOptions, accessToken: st
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     })
+    if (typeof window !== "undefined" && !performance.getEntriesByName("ceaser:first_api_response").length) {
+      const totalMs = Math.round(performance.now() - startedAt)
+      const serverMs = Number(response.headers.get("x-process-time-ms") || 0)
+      recordStartupMetric("first_api_response", {
+        path,
+        total_ms: totalMs,
+        server_processing_ms: serverMs || null,
+        estimated_network_ms: serverMs ? Math.max(0, totalMs - serverMs) : null,
+      })
+    }
+    return response
   } catch (error) {
     if (error instanceof DOMException && error.name === "TimeoutError") {
       throw new ApiError("CEASER is taking longer than expected. Please try again.", 408)
@@ -163,7 +204,7 @@ function timeoutFor(path: string) {
   return 30000
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function apiRequestInternal<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = String(options.method || "GET").toUpperCase()
   const cacheable = method === "GET" && canCache(path)
   const cacheKey = cacheable ? cacheKeyFor(path) : ""
@@ -216,6 +257,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const payload = (await response.json()) as T
   if (cacheable) writeCache(cacheKey, payload)
   return payload
+}
+
+export function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = String(options.method || "GET").toUpperCase()
+  if (method !== "GET" || !canCache(path)) return apiRequestInternal<T>(path, options)
+  const key = cacheKeyFor(path)
+  const existing = inFlightRequests.get(key)
+  if (existing) return existing as Promise<T>
+  const pending = apiRequestInternal<T>(path, options).finally(() => inFlightRequests.delete(key))
+  inFlightRequests.set(key, pending)
+  return pending
 }
 
 export async function apiStreamRequest(

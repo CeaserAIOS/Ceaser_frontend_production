@@ -9,6 +9,7 @@ import { chatApi, type ConversationRecord } from "@/lib/api/chat"
 import { projectsApi, type ProjectRecord } from "@/lib/api/projects"
 import { getUserDisplayName, getUserDisplayRole, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
+import { recordStartupMetric } from "@/lib/api/client"
 
 export function Sidebar() {
   const { currentPage, setCurrentPage } = useApp()
@@ -22,6 +23,10 @@ export function Sidebar() {
     void Promise.allSettled([projectsApi.list(), chatApi.listConversations(false)]).then(([projectResult, chatResult]) => {
       if (projectResult.status === "fulfilled") setProjects(projectResult.value)
       if (chatResult.status === "fulfilled") setChats(chatResult.value)
+      recordStartupMetric("secondary_data_ready", {
+        projects: projectResult.status === "fulfilled" ? projectResult.value.length : 0,
+        conversations: chatResult.status === "fulfilled" ? chatResult.value.length : 0,
+      })
     })
     const refresh = () => setProfile(readUserProfile())
     window.addEventListener("ceaser:profile-updated", refresh)

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { authApi, type AuthSession } from "@/lib/api/auth"
 import { adminApi } from "@/lib/api/admin"
-import { clearAuthTokens, getAccessToken } from "@/lib/api/client"
+import { ApiError, clearAuthTokens, getAccessToken, recordStartupMetric } from "@/lib/api/client"
 import { CeaserSelect } from "./ceaser-select"
 import { CeaserLogo } from "./ceaser-logo"
 import { SystemStatusCard } from "./system-status-card"
@@ -16,12 +16,14 @@ const PROFILE_KEY = "ceaser_user_profile"
 
 type Step = "welcome" | "auth" | "profile" | "permissions" | "hotkey" | "voice" | "ready"
 type AuthMode = "login" | "signup"
+type AuthStatus = "unknown" | "no_session" | "verifying" | "authenticated" | "unauthenticated" | "temporary_error"
 
 const useCases = ["Student", "Professional", "Founder", "Creator", "Developer"]
 
 export function WelcomeGate({ children }: { children: ReactNode }) {
   const { setCurrentPage } = useApp()
   const [isChecking, setIsChecking] = useState(true)
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("unknown")
   const [session, setSession] = useState<AuthSession | null>(null)
   const [onboardingComplete, setOnboardingComplete] = useState(false)
   const [step, setStep] = useState<Step>("welcome")
@@ -53,10 +55,13 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
     let mounted = true
     const safetyTimer = window.setTimeout(() => {
       if (!mounted) return
-      setSession(null)
-      setOnboardingComplete(false)
-      setStep("auth")
-      setMessage("CEASER is taking longer than usual to verify your session. Please wait or sign in again.")
+      if (getAccessToken()) {
+        setAuthStatus("temporary_error")
+        setMessage("CEASER is reconnecting. Cached workspace data remains available.")
+      } else {
+        setAuthStatus("unauthenticated")
+        setStep("auth")
+      }
       setIsChecking(false)
     }, 30000)
     async function checkSession() {
@@ -67,9 +72,14 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       }
       const token = getAccessToken()
       if (!token) {
-        if (mounted) setIsChecking(false)
+        if (mounted) {
+          setAuthStatus("no_session")
+          setIsChecking(false)
+        }
         return
       }
+      setAuthStatus("verifying")
+      recordStartupMetric("auth_verify_start")
       try {
         const current = await authApi.getCurrentUser()
         if (!mounted) return
@@ -92,12 +102,21 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
         if (completed) window.localStorage.setItem(ONBOARDING_KEY, "true")
         setOnboardingComplete(completed)
         setStep(completed ? "ready" : "profile")
-      } catch {
+        setAuthStatus("authenticated")
+        recordStartupMetric("auth_ready")
+      } catch (error) {
         if (!mounted) return
-        setSession(null)
-        setOnboardingComplete(false)
-        setStep("auth")
-        setMessage("CEASER could not verify your session. Please sign in again if this continues.")
+        const definitiveAuthFailure = error instanceof ApiError && error.status === 401
+        if (definitiveAuthFailure || !getAccessToken()) {
+          setSession(null)
+          setOnboardingComplete(false)
+          setAuthStatus("unauthenticated")
+          setStep("auth")
+          setMessage("Your session expired. Please sign in again.")
+        } else {
+          setAuthStatus("temporary_error")
+          setMessage("CEASER is reconnecting. Your saved workspace remains available.")
+        }
       } finally {
         window.clearTimeout(safetyTimer)
         if (mounted) setIsChecking(false)
@@ -149,11 +168,19 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
 
   const stepIndex = ["welcome", "auth", "profile", "permissions", "hotkey", "voice", "ready"].indexOf(step)
   const isComplete = Boolean(session && onboardingComplete)
+  const canOptimisticallyRender = Boolean(
+    typeof window !== "undefined"
+    && getAccessToken()
+    && window.localStorage.getItem(ONBOARDING_KEY) === "true"
+    && (isChecking || authStatus === "verifying" || authStatus === "temporary_error"),
+  )
 
   const firstName = useMemo(() => {
     const stored = readProfile()
     return stored?.name || name || sessionEmail(session)?.split("@")[0] || "there"
   }, [name, session])
+
+  if (canOptimisticallyRender) return <>{children}</>
 
   if (isChecking) {
     return (

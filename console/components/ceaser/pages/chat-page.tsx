@@ -6,6 +6,7 @@ import { chatApi, type AgentContribution, type CeaserChatResponse, type ChatMess
 import { documentsApi, type DocumentKind } from "@/lib/api/documents"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
+import { recordStartupMetric } from "@/lib/api/client"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -515,9 +516,13 @@ export function ChatPage() {
       setMessages([])
       setIsConversationLoading(false)
       setIsBooting(false)
+      recordStartupMetric("composer_rendered")
+      recordStartupMetric("input_interactive")
       hasBootedRef.current = true
 
       const records = await loadConversations()
+      recordStartupMetric("conversation_list_ready", { conversations: records.length })
+      recordStartupMetric("core_data_ready")
       const preferredId = preferredConversationRef.current
       if (preferredId && records.some((conversation) => conversation.id === preferredId)) {
         setActiveConversationId(preferredId)

@@ -33,9 +33,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
 function AppLayoutShell({ children }: AppLayoutProps) {
   const { currentPage } = useApp()
-  const missionActive = currentPage === "mission-control" || currentPage === "student"
   return (
-    <div className={cn("ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background", missionActive && "ceaser-mission-shell")}>
+    <div className="ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background">
       {typeof window !== 'undefined' && !!(window as any).ceaserDesktop?.windowClose && <WindowTitlebar />}
       <div className="spatial-shell flex min-h-0 flex-1 overflow-hidden p-2">
         <Sidebar />

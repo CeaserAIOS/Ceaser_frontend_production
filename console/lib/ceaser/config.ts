@@ -6,7 +6,6 @@ import {
   FileText,
   FolderKanban,
   GraduationCap,
-  LayoutDashboard,
   MessageSquare,
   Puzzle,
   Search,
@@ -258,7 +257,6 @@ const baseNavigationItems: NavigationItem[] = [
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "files", label: "Files", icon: FileText },
   { id: "memory", label: "Memory", icon: BrainCircuit },
-  { id: "mission-control", label: "Mission Control", icon: LayoutDashboard },
   { id: "settings", label: "Settings", icon: Settings },
 ]
 
@@ -266,5 +264,5 @@ export const navigationItems: NavigationItem[] = baseNavigationItems.filter((ite
 
 export const getAgent = (id: string) => ceaserAgents.find((agent) => agent.id === id)
 export const getEngine = (id: string) => ceaserEngines.find((engine) => engine.id === id)
-export const getPageTitle = (id: string) => navigationItems.find((item) => item.id === id)?.label ?? "Mission Control"
+export const getPageTitle = (id: string) => navigationItems.find((item) => item.id === id)?.label ?? "Chat"
 

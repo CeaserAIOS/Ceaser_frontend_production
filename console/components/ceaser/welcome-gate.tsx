@@ -187,9 +187,9 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
       if (authMode === "login") {
         try {
           const admin = await adminApi.me()
-          setCurrentPage(admin.is_admin ? "admin" : "mission-control")
+          setCurrentPage(admin.is_admin ? "admin" : "chat")
         } catch {
-          setCurrentPage("mission-control")
+          setCurrentPage("chat")
         }
         const completed = Boolean(next.onboarding_completed)
         setOnboardingComplete(completed)

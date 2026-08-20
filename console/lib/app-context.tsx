@@ -94,11 +94,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem("ceaser_theme", "dark")
     const params = new URLSearchParams(window.location.search)
     const view = params.get("view") || window.localStorage.getItem("ceaser_current_page")
-    if (view) setCurrentPage(view === "student" && !ENABLE_STUDENT_HUB ? "mission-control" : (view as AppPage))
+    if (view) setCurrentPage(
+      view === "mission-control" || (view === "student" && !ENABLE_STUDENT_HUB)
+        ? "chat"
+        : (view as AppPage),
+    )
   }, [])
 
   const setPage = (page: AppPage) => {
-    const nextPage = page === "student" && !ENABLE_STUDENT_HUB ? "mission-control" : page
+    const nextPage = page === "mission-control" || (page === "student" && !ENABLE_STUDENT_HUB) ? "chat" : page
     setCurrentPage(nextPage)
     if (typeof window === "undefined") return
     window.localStorage.setItem("ceaser_current_page", nextPage)

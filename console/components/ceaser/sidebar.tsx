@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react"
-import { ChevronDown, FileText, Folder, LayoutDashboard, MessageSquarePlus, MoreHorizontal, Puzzle, Search, Settings, Sparkles } from "lucide-react"
+import { ChevronDown, FileText, Folder, MessageSquarePlus, MoreHorizontal, Puzzle, Search, Settings, Sparkles } from "lucide-react"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
 import { useApp } from "@/lib/app-context"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
@@ -44,7 +44,7 @@ export function Sidebar() {
       <NavButton icon={FileText} label="Library" active={currentPage === "files"} onClick={() => setCurrentPage("files")} />
       <NavButton icon={Puzzle} label="Plugins" active={currentPage === "integrations"} onClick={() => setCurrentPage("integrations")} />
       <NavButton icon={MoreHorizontal} label="More" onClick={() => setShowMore((value) => !value)} />
-      {showMore && <div className="ml-3 border-l border-white/10 pl-2"><NavButton compact icon={LayoutDashboard} label="Mission Control" onClick={() => setCurrentPage("mission-control")} /><NavButton compact icon={Settings} label="Settings" onClick={() => setCurrentPage("settings")} /></div>}
+      {showMore && <div className="ml-3 border-l border-white/10 pl-2"><NavButton compact icon={Settings} label="Settings" onClick={() => setCurrentPage("settings")} /></div>}
     </div>
     <div className="mx-3 flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-3"><Search className="h-3.5 w-3.5 text-white/45" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-white/35" /></div>
     <div className="mt-3 flex-1 overflow-y-auto px-3 pb-5 [scrollbar-width:thin]">

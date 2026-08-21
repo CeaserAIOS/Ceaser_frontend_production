@@ -42,16 +42,25 @@ export function Sidebar() {
     window.dispatchEvent(new CustomEvent(id ? "ceaser:open-conversation" : "ceaser:new-chat", { detail: { id } }))
   }
 
-  return <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-white/[0.08] bg-[#050810] text-white">
+  return <aside className="ceaser-global-sidebar flex h-full w-[260px] shrink-0 flex-col border-r border-white/[0.08] bg-[#050810] text-white">
     <button onClick={() => openChat()} className="flex h-[76px] items-center px-4 text-left hover:bg-white/[0.03]"><Image src={darkWordmark} alt="CEASER" width={170} height={42} className="h-9 w-auto object-contain" priority /></button>
     <div className="px-3 pb-2">
+      <div className="mb-2 flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-3 focus-within:border-cyan-300/40 focus-within:bg-white/[0.04]">
+        <Search className="h-3.5 w-3.5 shrink-0 text-white/45" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search chats..."
+          aria-label="Search chats"
+          className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-white/35"
+        />
+      </div>
       <NavButton icon={MessageSquarePlus} label="New chat" onClick={() => openChat()} />
       <NavButton icon={FileText} label="Library" active={currentPage === "files"} onClick={() => setCurrentPage("files")} />
       <NavButton icon={Puzzle} label="Plugins" active={currentPage === "integrations"} onClick={() => setCurrentPage("integrations")} />
       <NavButton icon={MoreHorizontal} label="More" onClick={() => setShowMore((value) => !value)} />
       {showMore && <div className="ml-3 border-l border-white/10 pl-2"><NavButton compact icon={Settings} label="Settings" onClick={() => setCurrentPage("settings")} /></div>}
     </div>
-    <div className="mx-3 flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-3"><Search className="h-3.5 w-3.5 text-white/45" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-white/35" /></div>
     <div className="mt-3 flex-1 overflow-y-auto px-3 pb-5 [scrollbar-width:thin]">
       <SidebarSection title="Pinned">{chats.filter((chat) => chat.pinned).slice(0, 3).map((chat) => <SidebarRow key={chat.id} icon={Sparkles} label={chat.title} onClick={() => openChat(chat.id)} />)}</SidebarSection>
       <SidebarSection title="Projects">{filteredProjects.map((project) => <SidebarRow key={project.id} icon={Folder} label={project.name} onClick={() => { window.localStorage.setItem("ceaser_selected_project_id", project.id); setCurrentPage("projects") }} />)}{!filteredProjects.length && <p className="px-2 py-2 text-xs text-white/35">No projects yet</p>}</SidebarSection>

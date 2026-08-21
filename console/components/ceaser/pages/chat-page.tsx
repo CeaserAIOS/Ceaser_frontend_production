@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ChangeEvent, ReactNode } from "react"
 import { chatApi, type AgentContribution, type CeaserChatResponse, type ChatMessage, type ConversationRecord, type MessageMetadata, type RankedMemory, type ResearchResult, type WorkflowResult } from "@/lib/api/chat"
-import { documentsApi, type DocumentKind } from "@/lib/api/documents"
+import { documentsApi, type DocumentKind, type GeneratedDocument } from "@/lib/api/documents"
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
 import { recordStartupMetric } from "@/lib/api/client"
@@ -15,7 +15,7 @@ import { RichResponseRenderer } from "../rich-response-renderer"
 import { FOOTER_VOICE_EVENT } from "../command-bar"
 import { navigationItems } from "@/lib/ceaser"
 import type { VoiceRespondResponse } from "@/lib/api/voice"
-import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Edit3, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react"
+import { Archive, BarChart3, Bookmark, CalendarPlus, Check, CheckCircle2, ChevronLeft, Code2, Copy, Download, Edit3, ExternalLink, FileText, Lightbulb, Loader2, Mail, MessageSquare, MoreHorizontal, Paperclip, PenLine, Pin, PinOff, Plus, Presentation, RefreshCw, RotateCcw, Search, Send, Share2, Sparkles, Square, Star, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 interface Message {
@@ -32,6 +32,7 @@ interface Message {
   research?: ResearchResult | null
   workflow?: WorkflowResult | null
   documentRequest?: DocumentRequest
+  artifact?: GeneratedArtifact
   richResponse?: CeaserChatResponse["rich_response"]
   isTyping?: boolean
   isStreaming?: boolean
@@ -228,6 +229,90 @@ const hasStructuredRichContent = (response: CeaserChatResponse["rich_response"])
   if (!response?.blocks?.length) return false
   const structuredTypes = new Set(["code", "table", "chart", "image", "generated_image", "image_group", "file", "project"])
   return response.blocks.some((block) => structuredTypes.has(String(block.type ?? "").toLowerCase()))
+}
+
+type GeneratedArtifact = {
+  id: string
+  fileId: string
+  title: string
+  format: DocumentKind
+  status: "ready" | "failed"
+  filename: string
+  preview: string
+  metadata: Record<string, unknown>
+}
+
+function artifactFromDocument(document: GeneratedDocument, preview = ""): GeneratedArtifact {
+  return {
+    id: document.id,
+    fileId: document.file_id,
+    title: document.file_name || document.source_prompt,
+    format: document.export_format,
+    status: "ready",
+    filename: document.file_name || `ceaser-artifact.${document.export_format}`,
+    preview,
+    metadata: {},
+  }
+}
+
+function extractCodeArtifact(content: string): { language: string; code: string; filename: string } | null {
+  const match = content.match(/```([\w+#.-]*)\s*\n([\s\S]*?)```/)
+  if (!match || match[2].trim().length < 240) return null
+  const language = match[1].toLowerCase() || "text"
+  const filename = language === "html" ? "index.html" : language === "css" ? "styles.css" : language === "javascript" || language === "js" ? "script.js" : language === "python" ? "main.py" : "code.txt"
+  return { language, code: match[2].replace(/^\n+|\n+$/g, ""), filename }
+}
+
+function CodeArtifactCard({ artifact }: { artifact: { language: string; code: string; filename: string } }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    await navigator.clipboard?.writeText(artifact.code)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }
+  const download = () => {
+    const blob = new Blob([artifact.code], { type: artifact.language === "html" ? "text/html" : "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = artifact.filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  const preview = artifact.language === "html" ? () => {
+    const url = URL.createObjectURL(new Blob([artifact.code], { type: "text/html" }))
+    window.open(url, "_blank", "noopener,noreferrer")
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } : undefined
+  return <section className="overflow-hidden rounded-xl border border-cyan-300/20 bg-[#050914] shadow-[0_18px_50px_rgba(0,0,0,.18)]">
+    <header className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
+      <Code2 className="h-4 w-4 text-cyan-300" /><span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{artifact.filename}</span><span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-300">Ready</span>
+      <button onClick={() => void copy()} className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/[0.06]">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy"}</button>
+      <button onClick={download} className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/[0.06]"><Download className="h-3.5 w-3.5" />Download</button>
+      {preview && <button onClick={preview} className="inline-flex items-center gap-1.5 rounded-md border border-cyan-300/20 px-2.5 py-1.5 text-xs text-cyan-200 hover:bg-cyan-300/[0.08]"><ExternalLink className="h-3.5 w-3.5" />Preview</button>}
+    </header>
+    <pre className="max-h-[34rem] overflow-auto p-4 text-xs leading-6 text-slate-200"><code>{artifact.code}</code></pre>
+  </section>
+}
+
+function GeneratedArtifactCard({ artifact }: { artifact: GeneratedArtifact }) {
+  const [open, setOpen] = useState(false)
+  const [downloadError, setDownloadError] = useState(false)
+  const kindLabel = artifact.format.toUpperCase()
+  const download = async () => {
+    setDownloadError(false)
+    try {
+      await filesApi.download({ id: artifact.fileId, name: artifact.filename } as FileRecord)
+    } catch {
+      setDownloadError(true)
+    }
+  }
+  if (artifact.status === "failed") return <section className="rounded-xl border border-rose-400/20 bg-rose-400/[0.06] p-4"><p className="text-sm font-semibold text-rose-100">Couldn&apos;t finish this {kindLabel} artifact.</p><p className="mt-1 text-xs text-rose-100/60">The response is still available, but file creation failed.</p></section>
+  return <section className="min-w-0 overflow-hidden rounded-xl border border-cyan-300/20 bg-[#080d1b] shadow-[0_18px_50px_rgba(0,0,0,.18)]">
+    <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3"><FileText className="h-5 w-5 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-white">{artifact.title}</p><p className="mt-0.5 text-xs text-white/45">{kindLabel} · {String(artifact.metadata.pages || artifact.metadata.sheets || artifact.metadata.sections || "Generated artifact")}</p></div><span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] font-medium text-emerald-300">Ready</span></header>
+    <div className="flex flex-wrap gap-2 px-4 py-3"><button onClick={() => setOpen((value) => !value)} className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/[0.06]">{open ? "Close preview" : "Open"}</button><button onClick={() => void download()} className="inline-flex items-center gap-1.5 rounded-md border border-cyan-300/20 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-300/[0.08]"><Download className="h-3.5 w-3.5" />Download {kindLabel}</button>{downloadError && <span className="self-center text-xs text-rose-300">Download unavailable</span>}</div>
+    {open && <div className="max-h-72 overflow-auto border-t border-white/10 p-4 text-sm leading-6 text-white/70 whitespace-pre-wrap">{artifact.preview || "Preview unavailable. The generated file is still available to download."}</div>}
+  </section>
 }
 
 const metadataFromRecord = (message: ChatMessage): MessageMetadata => {
@@ -448,8 +533,15 @@ export function ChatPage() {
       }
       const normalized = await request
       if (requestId !== loadRequestRef.current) return
-      conversationCacheRef.current.set(conversationId, normalized)
-      setMessages(normalized)
+      const generated = await documentsApi.list().catch(() => [] as GeneratedDocument[])
+      const hydrated = normalized.map((message, index) => {
+        if (message.role !== "assistant") return message
+        const previousUser = [...normalized.slice(0, index)].reverse().find((item) => item.role === "user")
+        const match = generated.find((document) => previousUser && document.source_prompt.trim().toLowerCase() === previousUser.content.trim().toLowerCase())
+        return match ? { ...message, artifact: artifactFromDocument(match, message.content) } : message
+      })
+      conversationCacheRef.current.set(conversationId, hydrated)
+      setMessages(hydrated)
       setLoadError(null)
     } catch (error) {
       if (requestId !== loadRequestRef.current) return
@@ -886,6 +978,28 @@ export function ChatPage() {
         if (conversationId) conversationCacheRef.current.set(conversationId, next)
         return next
       })
+      if (documentRequest && conversationId) {
+        void documentsApi.create({
+          kind: documentRequest.kind,
+          prompt: content,
+          agent_id: documentRequest.agentId,
+          source_content: assistantMessage.content.slice(0, 50000) || null,
+        }).then((generated) => {
+          const artifact: GeneratedArtifact = {
+            id: generated.document.id,
+            fileId: generated.document.file_id,
+            title: generated.document.file_name || documentRequest.label,
+            format: generated.document.export_format,
+            status: "ready",
+            filename: generated.document.file_name || `${documentRequest.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.${generated.document.export_format}`,
+            preview: generated.preview || assistantMessage.content || "",
+            metadata: (generated.file?.extraction_metadata as Record<string, unknown>) || {},
+          }
+          setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, artifact } : message))
+        }).catch(() => {
+          setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, artifact: { id: `failed-${typingMessage.id}`, fileId: "", title: documentRequest.label, format: documentRequest.kind, status: "failed", filename: "", preview: "", metadata: {} } } : message))
+        })
+      }
       if (conversationId) {
         const convoId = conversationId
         void (async () => {
@@ -1262,7 +1376,6 @@ export function ChatPage() {
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <section className="relative flex min-h-0 w-full flex-1 flex-col px-8 pb-5 lg:px-16">
           {messages.length ? <header className="-mx-8 flex h-20 shrink-0 items-center border-b border-white/[0.08] px-8 lg:-mx-16 lg:px-10"><h1 className="truncate text-lg font-semibold text-white">{activeConversation?.title || firstMeaningfulLine(messages.find((item) => item.role === "user")?.content || "CEASER conversation")}</h1>{activeConversation ? <><button onClick={() => void handleTogglePinConversation(activeConversation)} className={cn("ml-3 transition hover:text-cyan-200", activeConversation.pinned ? "text-cyan-300" : "text-white/55")} title={activeConversation.pinned ? "Unpin chat" : "Pin chat"} aria-label={activeConversation.pinned ? "Unpin chat" : "Pin chat"}><Star className={cn("h-4 w-4", activeConversation.pinned && "fill-current")} /></button><div className="relative ml-auto"><button onClick={() => setOpenConversationMenuId(openConversationMenuId === activeConversation.id ? null : activeConversation.id)} className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Chat options"><MoreHorizontal className="h-5 w-5" /></button>{openConversationMenuId === activeConversation.id ? <div className="absolute right-0 top-11 z-40 w-48 rounded-2xl border border-border bg-popover p-2 shadow-2xl"><ConversationMenuItem icon={Edit3} label="Rename" onClick={() => void handleRenameConversation(activeConversation)} /><ConversationMenuItem icon={activeConversation.pinned ? PinOff : Pin} label={activeConversation.pinned ? "Unpin" : "Pin"} onClick={() => void handleTogglePinConversation(activeConversation)} /><ConversationMenuItem icon={activeConversation.archived ? RotateCcw : Archive} label={activeConversation.archived ? "Unarchive" : "Archive"} onClick={() => void (activeConversation.archived ? handleUnarchiveConversation(activeConversation) : handleArchiveConversation(activeConversation))} /><ConversationMenuItem icon={Trash2} label="Delete" onClick={() => void handleDeleteConversation(activeConversation)} danger /></div> : null}</div></> : null}</header> : null}
-          {!messages.length && !isBooting && !isActiveChatLoading ? <div className="absolute right-8 top-5 z-20 hidden items-center gap-3 lg:flex"><button className="flex h-11 w-72 items-center gap-2 rounded-full border border-white/10 bg-[#080d1a]/90 px-4 text-sm text-white/55"><Search className="h-4 w-4" />Search or ask anything...<span className="ml-auto rounded-md border border-white/10 px-2 py-1 text-[10px]">⌘ K</span></button></div> : null}
           <div
             ref={chatScrollRef}
             onScroll={captureScrollPosition}
@@ -1585,6 +1698,10 @@ function ChatBubble({
                 ? <ProjectReportCard report={parseProjectReport(message.content)!} />
                 : message.role === "assistant" && !message.isStreaming && parseFridayStructuredResponse(message.content)
                 ? <StructuredResponseCard response={parseFridayStructuredResponse(message.content)!} />
+                : message.role === "assistant" && !message.isStreaming && message.artifact
+                ? <><MarkdownMessage content={stripSandboxArtifactLinks(message.content)} isUser={false} isStreaming={false} /><GeneratedArtifactCard artifact={message.artifact} /></>
+                : message.role === "assistant" && !message.isStreaming && extractCodeArtifact(message.content)
+                ? <CodeArtifactCard artifact={extractCodeArtifact(message.content)!} />
                 : <MarkdownMessage content={message.role === "assistant" ? stripSandboxArtifactLinks(message.content) : message.content} isUser={message.role === "user"} isStreaming={Boolean(message.isStreaming)} />}
             {message.role === "assistant" && !message.isStreaming && message.research?.images?.length ? (
               <ResearchImageStrip images={message.research.images} />

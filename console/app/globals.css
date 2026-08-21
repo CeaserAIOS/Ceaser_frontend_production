@@ -1,6 +1,30 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Keep the product shell usable on compact laptops without scaling the UI. */
+@media (min-width: 768px) and (max-width: 1399px) {
+  .ceaser-global-sidebar {
+    width: 220px;
+  }
+  .ceaser-product-shell .ceaser-app-frame {
+    margin-left: 0.5rem;
+  }
+  .ceaser-chat .ceaser-composer,
+  .ceaser-chat .ceaser-conversation-composer {
+    max-width: min(980px, calc(100vw - 300px));
+  }
+}
+
+@media (max-width: 767px) {
+  .ceaser-global-sidebar {
+    width: min(86vw, 280px);
+  }
+  .ceaser-chat .ceaser-composer,
+  .ceaser-chat .ceaser-conversation-composer {
+    max-width: 100%;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

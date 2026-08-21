@@ -5,7 +5,7 @@
  */
 (function () {
   var injected = "__CEASER_LAUNCHED__";
-  var launchDate = "2026-08-21T14:00:00+05:30";
+  var launchDate = "2026-08-21T14:15:00+05:30";
   var launchedByEnv = injected === "true" && Date.now() >= new Date(launchDate).getTime();
   var launchedByDate = Date.now() >= new Date(launchDate).getTime();
 

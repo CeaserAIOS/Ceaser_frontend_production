@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react"
-import { ChevronDown, FileText, Folder, MessageSquarePlus, MoreHorizontal, Puzzle, Search, Settings, Sparkles } from "lucide-react"
+import { ChevronDown, FileText, Folder, FolderKanban, MessageSquarePlus, MoreHorizontal, Puzzle, Search, Settings, Sparkles } from "lucide-react"
 import darkWordmark from "@/public/ceaser-wordmark-dark-transparent.png"
 import { useApp } from "@/lib/app-context"
 import { chatApi, type ConversationRecord } from "@/lib/api/chat"
@@ -57,6 +57,7 @@ export function Sidebar() {
       </div>
       <NavButton icon={MessageSquarePlus} label="New chat" onClick={() => openChat()} />
       <NavButton icon={FileText} label="Library" active={currentPage === "files"} onClick={() => setCurrentPage("files")} />
+      <NavButton icon={FolderKanban} label="Projects" active={currentPage === "projects"} onClick={() => setCurrentPage("projects")} />
       <NavButton icon={Puzzle} label="Plugins" active={currentPage === "integrations"} onClick={() => setCurrentPage("integrations")} />
       <NavButton icon={MoreHorizontal} label="More" onClick={() => setShowMore((value) => !value)} />
       {showMore && <div className="ml-3 border-l border-white/10 pl-2"><NavButton compact icon={Settings} label="Settings" onClick={() => setCurrentPage("settings")} /></div>}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Check, ChevronRight, Loader2, MoreHorizontal, Search, ShieldCheck, X } from "lucide-react"
 import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { cn } from "@/lib/utils"
+import { trackEvent } from "@/lib/analytics"
 
 type Plugin = { id: string; name: string; description: string; category: string; icon: string; services?: string[] }
 const live = new Set(["github", "notion", "gmail", "google-drive", "google-calendar", "google-tasks", "google-classroom"])
@@ -41,11 +42,20 @@ export function IntegrationsPage() {
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  useEffect(() => { integrationsApi.list().then(setRecords).catch(() => setRecords([])).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    integrationsApi.list().then((nextRecords) => {
+      setRecords(nextRecords)
+      const pending = window.sessionStorage.getItem("ceaser_pending_plugin")
+      if (pending && nextRecords.some((record) => record.id === pending && record.connected)) {
+        trackEvent("plugin_connected", { plugin_name: pending })
+        window.sessionStorage.removeItem("ceaser_pending_plugin")
+      }
+    }).catch(() => setRecords([])).finally(() => setLoading(false))
+  }, [])
   const status = (id: string) => records.find((record) => record.id === id)
   const connectedCount = records.filter((record) => record.connected).length
   const filtered = useMemo(() => plugins.filter((plugin) => (category === "All" || category === "Recommended" && plugins.indexOf(plugin) < 4 || plugin.category === category) && `${plugin.name} ${plugin.description}`.toLowerCase().includes(query.toLowerCase())), [category, query])
-  async function connect(plugin: Plugin) { if (!live.has(plugin.id)) return setSelected(plugin); setBusy(plugin.id); try { const result = await integrationsApi.connect(plugin.id); if (result.auth_url) window.location.href = result.auth_url } finally { setBusy(null) } }
+  async function connect(plugin: Plugin) { if (!live.has(plugin.id)) return setSelected(plugin); trackEvent("plugin_connect_started", { plugin_name: plugin.id }); window.sessionStorage.setItem("ceaser_pending_plugin", plugin.id); setBusy(plugin.id); try { const result = await integrationsApi.connect(plugin.id); if (result.auth_url) window.location.href = result.auth_url; else { trackEvent("plugin_connected", { plugin_name: plugin.id }); window.sessionStorage.removeItem("ceaser_pending_plugin"); setRecords(await integrationsApi.list()) } } finally { setBusy(null) } }
   async function disconnect(plugin: Plugin) { setBusy(plugin.id); try { await integrationsApi.disconnect(plugin.id); setRecords(await integrationsApi.list()) } finally { setBusy(null) } }
 
   return <div className="h-full overflow-y-auto bg-[#03060d] text-white">

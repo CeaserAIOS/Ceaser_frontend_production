@@ -12,6 +12,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { useApp } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { recordStartupMetric } from "@/lib/api/client"
+import { trackEvent } from "@/lib/analytics"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -37,6 +38,7 @@ function AppLayoutShell({ children }: AppLayoutProps) {
   useEffect(() => {
     recordStartupMetric("app_navigation_start", { page: currentPage })
     recordStartupMetric("shell_visible")
+    trackEvent("console_opened")
   }, [])
   return (
     <div className="ceaser-product-shell flex h-screen flex-col overflow-hidden bg-background">

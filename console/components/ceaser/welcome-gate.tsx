@@ -8,6 +8,7 @@ import { CeaserSelect } from "./ceaser-select"
 import { CeaserLogo } from "./ceaser-logo"
 import { SystemStatusCard } from "./system-status-card"
 import { cn } from "@/lib/utils"
+import { trackEvent } from "@/lib/analytics"
 import { useApp } from "@/lib/app-context"
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mic, MonitorCog, ShieldCheck, Sparkles, UserRound, Wand2 } from "lucide-react"
 
@@ -197,6 +198,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
   async function submitAuth() {
     setMessage("")
     setAuthBusy(true)
+    if (authMode === "signup") trackEvent("sign_up_started")
     try {
       const next = authMode === "login" ? await authApi.login(email.trim(), password) : await authApi.signup(email.trim(), password)
       if (authMode === "signup" && !next.access_token) {
@@ -205,6 +207,7 @@ export function WelcomeGate({ children }: { children: ReactNode }) {
         return
       }
       setSession(next)
+      trackEvent(authMode === "signup" ? "sign_up" : "login")
       const signedInEmail = sessionEmail(next) || email.trim()
       if (authApi.isDesktopLinkRequest() && authApi.completeDesktopLink(next)) {
         setMessage("Account connected. Returning to CEASER Desktop...")

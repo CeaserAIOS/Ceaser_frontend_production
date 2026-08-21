@@ -74,8 +74,14 @@
   }
 
   /* -------- Download tracking -------- */
+  document.querySelectorAll('a[href^="/console/"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      if (window.ceaserTrackEvent) window.ceaserTrackEvent("try_ceaser_clicked", { location: "landing", destination: "/console/" });
+    });
+  });
   document.querySelectorAll('a[href="/downloads/"], a[href="/downloads"]').forEach(function (link) {
     link.addEventListener("click", function () {
+      if (window.ceaserTrackEvent) window.ceaserTrackEvent("desktop_download_clicked", { platform: "windows" });
       var apiBase = ((window.CEASER_CONFIG && window.CEASER_CONFIG.API_BASE_URL) || "https://ceaser-backend-production.onrender.com").replace(/\/$/, "");
       var payload = JSON.stringify({ source: "landing", platform: "windows", version: "v1.0" });
       try {

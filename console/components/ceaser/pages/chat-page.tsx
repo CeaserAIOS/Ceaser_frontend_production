@@ -7,6 +7,7 @@ import { documentsApi, type DocumentKind, type GeneratedDocument } from "@/lib/a
 import { filesApi, type FileRecord } from "@/lib/api/files"
 import { useApp } from "@/lib/app-context"
 import { recordStartupMetric } from "@/lib/api/client"
+import { trackEvent } from "@/lib/analytics"
 import { getUserDisplayName, readUserProfile } from "@/lib/user-profile"
 import { cn } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -832,6 +833,7 @@ export function ChatPage() {
   const handleSend = async (messageOverride?: string, forceNewStream = false) => {
     const content = (messageOverride ?? input).trim()
     if (!content || (isLoading && !forceNewStream)) return
+    trackEvent("chat_message_sent")
     cancelActiveStream()
     const documentRequest = detectDocumentRequest(content)
     // A newly sent message should be visible, but once the user scrolls up we
@@ -973,12 +975,14 @@ export function ChatPage() {
       }
 
       const assistantMessage: Message = { ...responseToMessage(typingMessage.id, response), documentRequest: documentRequest ?? undefined }
+      trackEvent("chat_response_completed", { request_mode: String(response.context_summary?.request_mode ?? "chat"), provider: String(response.context_summary?.provider ?? "unknown"), model: String(response.context_summary?.model ?? "unknown"), success: true })
       setMessages((current) => {
         const next = current.map((message) => (message.id === typingMessage.id ? { ...assistantMessage, isTyping: false, isStreaming: false } : message))
         if (conversationId) conversationCacheRef.current.set(conversationId, next)
         return next
       })
       if (documentRequest && conversationId) {
+        trackEvent("artifact_requested", { artifact_type: documentRequest.kind })
         void documentsApi.create({
           kind: documentRequest.kind,
           prompt: content,
@@ -995,6 +999,7 @@ export function ChatPage() {
             preview: generated.preview || assistantMessage.content || "",
             metadata: (generated.file?.extraction_metadata as Record<string, unknown>) || {},
           }
+          trackEvent("artifact_completed", { artifact_type: documentRequest.kind })
           setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, artifact } : message))
         }).catch(() => {
           setMessages((current) => current.map((message) => message.id === typingMessage.id ? { ...message, artifact: { id: `failed-${typingMessage.id}`, fileId: "", title: documentRequest.label, format: documentRequest.kind, status: "failed", filename: "", preview: "", metadata: {} } } : message))

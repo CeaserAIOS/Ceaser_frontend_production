@@ -301,6 +301,9 @@ export async function apiStreamRequest(
   }
 
   if (!response.ok || !response.body) {
+    if (response.status === 429) {
+      throw new ApiError("You're sending requests pretty quickly. Try again in a few seconds.", 429)
+    }
     let message = "We couldn't complete your request. Please try again."
     try {
       const payload = await response.json()

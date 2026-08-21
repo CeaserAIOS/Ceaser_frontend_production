@@ -6,9 +6,13 @@ import { integrationsApi, type IntegrationRecord } from "@/lib/api/integrations"
 import { cn } from "@/lib/utils"
 
 type Plugin = { id: string; name: string; description: string; category: string; icon: string; services?: string[] }
-const live = new Set(["github", "notion"])
+const live = new Set(["github", "notion", "gmail", "google-drive", "google-calendar", "google-tasks", "google-classroom"])
 const plugins: Plugin[] = [
-  { id: "google-workspace", name: "Google Workspace", description: "Gmail, Drive, Calendar and more. Your complete workspace.", category: "Productivity", icon: "google", services: ["Gmail", "Google Drive", "Google Calendar", "Google Docs", "Google Sheets", "Google Contacts"] },
+  { id: "gmail", name: "Gmail", description: "Read messages, manage drafts, and send email when you ask.", category: "Productivity", icon: "gmail" },
+  { id: "google-drive", name: "Google Drive", description: "Search and read Drive files, including Docs and Sheets content.", category: "Productivity", icon: "googledrive", services: ["Google Drive", "Google Docs", "Google Sheets"] },
+  { id: "google-calendar", name: "Google Calendar", description: "Read events and manage your schedule with CEASER.", category: "Productivity", icon: "googlecalendar" },
+  { id: "google-tasks", name: "Google Tasks", description: "Read task lists, open tasks, and due dates.", category: "Productivity", icon: "googletasks" },
+  { id: "google-classroom", name: "Google Classroom", description: "Read courses, coursework, assignments, and due dates.", category: "Productivity", icon: "googleclassroom" },
   { id: "slack", name: "Slack", description: "Get messages, send updates and automate workflows.", category: "Communication", icon: "slack" },
   { id: "spotify", name: "Spotify", description: "Play, search and control music right from CEASER.", category: "Entertainment", icon: "spotify" },
   { id: "telegram", name: "Telegram", description: "Send messages and manage conversations.", category: "Communication", icon: "telegram" },

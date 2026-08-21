@@ -5,9 +5,12 @@ import appIcon from '@/public/app-icon.png'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.heyceaser.in'),
   title: 'CEASER - Personal Intelligence Operating System',
   description: 'Your AI Workforce is ready. Manage your personal AI agents with CEASER OS.',
   generator: 'CEASER',
+  alternates: { canonical: '/console/' },
+  robots: { index: false, follow: false },
   icons: {
     icon: favicon.src,
     apple: appIcon.src,
